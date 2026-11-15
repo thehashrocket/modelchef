@@ -39,8 +39,8 @@ export async function chat(
   models: ModelRef[],
   messages: Msg[],
   opts: ChatOpts,
-): Promise<{ text: string; used: ModelRef }> {
-  if (process.env.MOCK) return { text: mockChat(messages, opts), used: models[0]! };
+): Promise<{ text: string; used: ModelRef; stop: string }> {
+  if (process.env.MOCK) return { text: mockChat(messages, opts), used: models[0]!, stop: 'stop' };
 
   const errors: string[] = [];
   for (const ref of models) {
@@ -65,11 +65,17 @@ export async function chat(
           signal: AbortSignal.timeout(300_000),
         });
         if (res.ok) {
-          const data = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-          const text = data.choices?.[0]?.message?.content;
-          if (typeof text === 'string' && text.trim()) return { text, used: ref };
-          errors.push(`${ref.provider}/${ref.model}: empty completion`);
-          break;
+          const data = (await res.json()) as { choices?: { finish_reason?: string; message?: { content?: unknown } }[] };
+          const choice = data.choices?.[0];
+          const text = choice?.message?.content;
+          // `stop` says why the model stopped: "length" means it hit max_tokens.
+          const stop = String(choice?.finish_reason ?? 'unknown');
+          if (typeof text === 'string' && text.trim()) return { text, used: ref, stop };
+          // An empty reply is usually a blip, or a thinking model that spent its
+          // whole budget before writing anything. Worth another attempt.
+          errors.push(`${ref.provider}/${ref.model}: empty reply (stop reason: ${stop})`);
+          await sleep(attempt * 5_000);
+          continue;
         }
         const body = (await res.text()).replace(/\s+/g, ' ').slice(0, 300);
         errors.push(`${ref.provider}/${ref.model}: HTTP ${res.status} ${body}`);

@@ -65,10 +65,16 @@ interface Cooked {
 async function cook(chef: Contestant, messages: Msg[], path: string): Promise<Cooked> {
   const base = { chef, path, model: null, title: 'No dish', pitch: '', presentation: '', hasTitle: false, hasDescription: false };
   try {
-    const { text, used } = await chat(chef.models, messages, { maxTokens: chef.maxTokens, kind: 'cook', tag: chef.id });
+    const { text, used, stop } = await chat(chef.models, messages, { maxTokens: chef.maxTokens, kind: 'cook', tag: chef.id });
     const html = extractHtml(text);
     const model = `${used.provider}/${used.model}`;
-    if (!html) return { ...base, model, forfeit: 'The reply did not contain a complete HTML document.' };
+    if (!html) {
+      const why =
+        stop === 'length'
+          ? `The dish was cut off at the ${chef.maxTokens}-token output limit before </html>. Raise this chef's maxTokens.`
+          : `The reply did not contain a complete HTML document (stop reason: ${stop}, ${text.length} characters).`;
+      return { ...base, model, forfeit: why };
+    }
     writeFileSync(path, html);
     const meta = readMeta(html);
     return {

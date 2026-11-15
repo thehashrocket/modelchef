@@ -40,6 +40,7 @@ If a run fails, GitHub emails you and nothing is recorded, so the fix is to run 
 pnpm episode:mock   # a fake episode with canned models, written to .mock-data/
 pnpm build:mock     # build the site from it into dist/
 pnpm episode        # a real episode, written to data/
+DATA_DIR=.rehearsal pnpm episode   # a real episode against the live models that does not touch the season
 pnpm build
 ```
 
