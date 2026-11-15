@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreshKeep | Kitchen Expiry Tracker</title>
+    <meta name="description" content="A smart pantry management tool to track food expiry dates and reduce kitchen waste.">
+    <style>
+        :root {
+            --bg-color: #fdfbf7;
+            --card-bg: #ffffff;
+            --primary: #6b8e23; /* Olive Drab */
+            --primary-dark: #556b2f;
+            --accent: #e9c46a;
+            --text-main: #2d3436;
+            --text-muted: #636e72;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --success: #2ecc71;
+            --border: #dfe6e9;
+            --shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-top: 20px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .tagline {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        /* Quick Alert Section */
+        .alert-banner {
+            background: var(--accent);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: var(--shadow);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .alert-icon {
+            font-size: 1.5rem;
+        }
+
+        .alert-text {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* Form Styles */
+        .input-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+            border: 1px solid var(--border);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        input, select {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-add {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.2s;
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        .btn-add:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Filter/Search Section */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+
+        .search-box {
+            flex-grow: 1;
+            padding: 8px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        /* List Styles */
+        .pantry-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .item-card {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+            border-left: 6px solid var(--border);
+            animation: fadeIn 0.3s ease-in;
+            transition: transform 0.1s;
+        }
+
+        .item-card:active {
+            transform: scale(0.98);
+        }
+
+        .item-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-name {
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+
+        .item-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 10px;
+        }
+
+        .status-ok { background: #e8f5e9; color: var(--success); }
+        .status-soon { background: #fff3e0; color: var(--warning); }
+        .status-expired { background: #ffebee; color: var(--danger); }
+
+        .btn-delete {
+            background: none;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 5px 10px;
+            transition: color 0.2s;
+        }
+
+        .btn-delete:hover {
+            color: var(--danger);
+        }
+
+        /* Utility Classes */
+        .border-ok { border-left-color: var(--success); }
+        .border-soon { border-left-color: var(--warning); }
+        .border-expired { border-left-color: var(--danger); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        @media (max-width: 390px) {
+            .container { padding: 15px; }
+            .form-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1><span>🥬</span> FreshKeep</h1>
+            <div class="tagline">Smart Kitchen Expiry Tracker</div>
+        </header>
+
+        <div id="alertBox"></div>
+
+        <div class="input-card">
+            <div class="form-grid">
+                <div class="field full-width">
+                    <label for="itemName">Item Name</label>
+                    <input type="text" id="itemName" placeholder="e.g. Greek Yogurt">
+                </div>
+                <div class="field">
+                    <label for="itemCat">Category</label>
+                    <select id="itemCat">
+                        <option value="Dairy">Dairy</option>
+                        <option value="Produce">Produce</option>
+                        <option value="Meat">Meat/Protein</option>
+                        <option value="Pantry">Pantry</option>
+                        <option value="Frozen">Frozen</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="itemDate">Expiry Date</label>
+                    <input type="date" id="itemDate">
+                </div>
+            </div>
+            <button class="btn-add" onclick="addItem()">Add to Pantry</button>
+        </div>
+
+        <div class="controls">
+            <input type="text" id="searchBar" class="search-box" placeholder="Search items..." oninput="renderList()">
+        </div>
+
+        <div id="pantryList" class="pantry-list">
+            <!-- Items rendered here -->
+        </div>
+    </div>
+
+    <script>
+        // State Management
+        let pantry = [];
+
+        // Demo Content
+        const demoData = [
+            { id: 1, name: 'Whole Milk', cat: 'Dairy', date: getOffsetDate(2), created: Date.now() },
+            { id: 2, name: 'Baby Spinach', cat: 'Produce', date: getOffsetDate(-1), created: Date.now() },
+            { id: 3, name: 'Chicken Breast', cat: 'Meat', date: getOffsetDate(1), created: Date.now() },
+            { id: 4, name: 'Almond Flour', cat: 'Pantry', date: getOffsetDate(120), created: Date.now() },
+            { id: 5, name: 'Frozen Peas', cat: 'Frozen', date: getOffsetDate(30), created: Date.now() },
+        ];
+
+        function getOffsetDate(days) {
+            const d = new Date();
+            d.setDate(d.getDate() + days);
+            return d.toISOString().split('T')[0];
+        }
+
+        // Storage Helper
+        function saveToStorage() {
+            try {
+                localStorage.setItem('freshkeep_data', JSON.stringify(pantry));
+            } catch (e) {
+                console.warn("Storage unavailable, using session memory.");
+            }
+        }
+
+        function loadFromStorage() {
+            try {
+                const data = localStorage.getItem('freshkeep_data');
+                if (data) {
+                    pantry = JSON.parse(data);
+                    return true;
+                }
+            } catch (e) {
+                return false;
+            }
+            return false;
+        }
+
+        // Logic
+        function addItem() {
+            const nameInput = document.getElementById('itemName');
+            const catInput = document.getElementById('itemCat');
+            const dateInput = document.getElementById('itemDate');
+
+            if (!nameInput.value || !dateInput.value) {
+                alert("Please enter both a name and an expiry date.");
+                return;
+            }
+
+            const newItem = {
+                id: Date.now(),
+                name: nameInput.value,
+                cat: catInput.value,
+                date: dateInput.value,
+                created: Date.now()
+            };
+
+            pantry.push(newItem);
+            saveToStorage();
+            
+            // Reset form
+            nameInput.value = '';
+            dateInput.value = '';
+            
+            renderList();
+        }
+
+        function deleteItem(id) {
+            pantry = pantry.filter(item => item.id !== id);
+            saveToStorage();
+            renderList();
+        }
+
+        function getStatus(dateStr) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const expiry = new Date(dateStr);
+            expiry.setHours(0,0,0,0);
+            
+            const diffTime = expiry - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) return { label: 'Expired', class: 'expired', days: diffDays };
+            if (diffDays <= 3) return { label: 'Soon', class: 'soon', days: diffDays };
+            return { label: 'OK', class: 'ok', days: diffDays };
+        }
+
+        function updateAlerts() {
+            const alertBox = document.getElementById('alertBox');
+            const sorted = [...pantry].sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            if (sorted.length === 0) {
+                alertBox.innerHTML = '';
+                return;
+            }
+
+            const urgent = sorted[0];
+            const status = getStatus(urgent.date);
+
+            if (status.class === 'expired') {
+                alertBox.innerHTML = `
+                    <div class="alert-banner">
+                        <span class="alert-icon">⚠️</span>
+                        <span class="alert-text"><strong>Attention:</strong> ${urgent.name} has expired! Consider replacing it.</span>
+                    </div>`;
+            } else if (status.class === 'soon') {
+                alertBox.innerHTML = `
+                    <div class="alert-banner">
+                        <span class="alert-icon">🕒</span>
+                        <span class="alert-text"><strong>Use soon:</strong> ${urgent.name} expires in ${status.days} day(s).</span>
+                    </div>`;
+            } else {
+                alertBox.innerHTML = '';
+            }
+        }
+
+        function renderList() {
+            const listContainer = document.getElementById('pantryList');
+            const searchTerm = document.getElementById('searchBar').value.toLowerCase();
+            
+            // Sort by date ascending
+            const filtered = pantry
+                .filter(item => item.name.toLowerCase().includes(searchTerm))
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `<div class="empty-state">Your pantry is empty or no matches found.</div>`;
+                updateAlerts();
+                return;
+            }
+
+            listContainer.innerHTML = filtered.map(item => {
+                const status = getStatus(item.date);
+                return `
+                    <div class="item-card border-${status.class}">
+                        <div class="item-info">
+                            <div class="item-name">
+                                ${item.name}
+                                <span class="status-badge status-${status.class}">${status.label}</span>
+                            </div>
+                            <div class="item-meta">${item.cat} • Expires ${item.date}</div>
+                        </div>
+                        <button class="btn-delete" onclick="deleteItem(${item.id})" title="Remove item">×</button>
+                    </div>
+                `;
+            }).join('');
+
+            updateAlerts();
+        }
+
+        // Initialization
+        window.onload = () => {
+            if (!loadFromStorage()) {
+                pantry = demoData;
+            }
+            
+            // Set default date to tomorrow for convenience
+            document.getElementById('itemDate').value = getOffsetDate(1);
+            
+            renderList();
+        };
+    </script>
+</body>
+</html></html>

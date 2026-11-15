@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kitchen Recipe Vault</title>
+<meta name="description" content="A simple recipe book for home cooks to store and view favorite recipes.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*,
+*:before,
+*:after { box-sizing: border-box; }
+html, body { margin:0; padding:0; font-family: system-ui, sans-serif; background:#f5f5f5; color:#333; }
+body { padding: 1rem; }
+.container { max-width: 600px; margin: 0 auto; }
+header { text-align:center; margin-bottom: 1.5rem; }
+h1 { margin:0; font-size: 2rem; }
+
+form { background:#fff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+form h2 { margin:0 0 .5rem; font-size: 1.2rem; }
+form label { display:block; margin-top: .5rem; font-weight: 600; }
+form input, form textarea { width:100%; padding: .4rem; margin-top: .2rem; border:1px solid #ccc; border-radius:4px; }
+form button { margin-top: 1rem; padding: .6rem 1.2rem; background:#007b5f; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+form button:hover { background:#005f45; }
+
+.recipe { background:#fff; border:1px solid #ddd; border-radius:6px; padding:1rem; margin-bottom:1rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.recipe-title { font-weight:700; font-size:1.1rem; margin:0 0 .5rem; }
+.recipe-content { margin-top:.5rem; }
+.recipe-content summary { cursor:pointer; color:#007b5f; font-weight:600; }
+.recipe-ingredients, .recipe-instructions { margin:.5rem 0; padding-left:1.2rem; font-size:.95rem; }
+
+footer { text-align:center; margin-top:2rem; font-size:.85rem; color:#777; }
+
+@media (max-width: 390px) {
+  body { padding:.5rem; }
+  h1 { font-size:1.6rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Kitchen Recipe Vault</h1>
+  </header>
+
+  <section aria-label="Add a new recipe">
+    <form id="add-recipe-form">
+      <h2>Add New Recipe</h2>
+      <label for="recipe-title">Title</label>
+      <input type="text" id="recipe-title" name="title" required placeholder="e.g., Classic Pancakes">
+      <label for="recipe-ingredients">Ingredients (one per line)</label>
+      <textarea id="recipe-ingredients" name="ingredients" rows="4" required placeholder="1 cup flour\n2 eggs\n..."></textarea>
+      <label for="recipe-instructions">Instructions</label>
+      <textarea id="recipe-instructions" name="instructions" rows="6" required placeholder="Mix ingredients...\nCook on skillet...\nServe with syrup"></textarea>
+      <button type="submit">Add Recipe</button>
+    </form>
+  </section>
+
+  <section aria-label="Recipes list" id="recipes-list">
+    <!-- Recipes will appear here -->
+  </section>
+
+  <footer>
+    All data is stored locally; no network requests are made.
+  </footer>
+</div>
+
+<script>
+const DEMO_RECIPES = [
+  {
+    title: "Classic Pancakes",
+    ingredients: ["1 cup flour", "2 eggs", "½ cup milk", "1 tbsp sugar", "1/2 tsp baking powder", "Pinch of salt"],
+    instructions: [
+      "In a bowl, mix flour, sugar, baking powder, and salt.",
+      "Create a well in the center and add eggs, then pour in milk and stir until smooth.",
+      "Cook on a preheated non‑stick skillet over medium heat, pouring ¼ cup of batter for each pancake.",
+      "Flip when bubbles form, cook until golden brown, then serve with syrup."
+    ]
+  },
+  {
+    title: "Scrambled Eggs",
+    ingredients: ["2 large eggs", "2 tbsp milk", "Salt and pepper", "1 tbsp butter"],
+    instructions: [
+      Without a well, directly whisk eggs with milk, season, then pour into a buttered pan.",
+      "Cook slowly over low heat, stirring gently until just set.",
+      "Remove from heat, fold, and serve immediately."
+    ]
+  },
+  {
+    title: "Chocolate Chip Cookies",
+    ingredients: ["2¼ cups all‑purpose flour", "1 tsp baking soda", "1 tsp salt", "1 cup butter", "¾ cup granulated sugar", "¾ cup brown sugar", "2 large eggs", "2 tsp vanilla extract", "2 cups chocolate chips"],
+    instructions: [
+      "Preheat oven to 350°F (175°C).",
+      "Cream butter, sugars, and vanilla together.",
+      "Beat in eggs one at a time.",
+      "In a separate bowl whisk dry ingredients, then gradually add to wet mix.",
+      "Fold in chocolate chips.",
+      "Drop rounded tablespoons of dough onto lined baking sheets.",
+      "Bake 10‑12 minutes until edges are golden.",
+      "Cool on sheets 2 minutes before transferring."
+    ]
+  }
+];
+
+let recipes = [];
+
+function loadRecipes() {
+  try {
+    const stored = localStorage.getItem('kitchenVaultRecipes');
+    if (stored) {
+      recipes = JSON.parse(stored);
+    } else {
+      recipes = DEMO_RECIPES;
+      saveRecipes();
+    }
+  } catch (e) {
+    // Fallback to demo data on any error
+    recipes = DEMO_RECIPES;
+  }
+}
+
+function saveRecipes() {
+  try {
+    localStorage.setItem('kitchenVaultRecipes', JSON.stringify(recipes));
+  } catch (e) {
+    // Silent fail – data lives only in memory
+  }
+}
+
+function renderRecipe(r) {
+  const el = document.createElement('article');
+  el.className = 'recipe';
+  const ingredientsHtml = r.ingredients.map(i => `<li>${i}</li>`).join('');
+  const instructionsHtml = r.instructions.map(step => `<li>${step}</li>`).join('');
+  el.innerHTML = `
+    <div class="recipe-title">${r.title}</div>
+    <details class="recipe-content">
+      <summary>Show ingredients & instructions</summary>
+      <div class="recipe-ingredients">
+        <strong>Ingredients:</strong>
+        <ul>${ingredientsHtml}</ul>
+      </div>
+      <div class="recipe-instructions">
+        <strong>Instructions:</strong>
+        <ol>${instructionsHtml}</ol>
+      </div>
+    </details>
+  `;
+  return el;
+}
+
+function renderAll() {
+  const container = document.getElementById('recipes-list');
+  container.innerHTML = '';
+  recipes.forEach(r => {
+    const recEl = renderRecipe(r);
+    container.appendChild(recEl);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadRecipes();
+  renderAll();
+
+  const form = document.getElementById('add-recipe-form');
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const title = form.title.value.trim();
+    const ingredientsText = form.ingredients.value.trim();
+    const instructionsText = form.instructions.value.trim();
+    if (!title || !ingredientsText || !instructionsText) {
+      alert('Please fill in title, ingredients, and instructions.');
+      return;
+    }
+    const ingredients = ingredientsText.split('\n').map(line => line.trim()).filter(Boolean);
+    const instructions = instructionsText.split('\n').map(line => line.trim()).filter(Boolean);
+    const newRecipe = { title, ingredients, instructions };
+    recipes.push(newRecipe);
+    saveRecipes();
+    renderAll();
+    form.reset();
+  });
+});
+</script>
+</body>
+</html>
