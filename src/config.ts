@@ -106,17 +106,18 @@ export const JUDGES: Judge[] = [
   {
     id: 'pragmatist',
     name: 'The Pragmatist',
-    family: 'google',
+    // No chef comes from this lab, so this judge scores every dish. (It ran on
+    // Gemini in the pilot and had to sit out both Google chefs.)
+    family: 'inclusionai',
     lens: 'usefulness',
     persona:
       'You run a small business and have no patience for demos. You ask one question of every dish: would a real person open this a second time? You are blunt, specific, and fair.',
-    vision: true,
-    sourceChars: 60000,
-    // Gemini's Pro models are not served on the free tier (quota error), so
-    // this seat runs on Flash, with an older Flash as cover for busy spells.
+    vision: false,
+    sourceChars: 40000,
+    // The fallback is another lab with no chef in the kitchen.
     models: [
-      { provider: 'gemini', model: 'gemini-3.8-flash' },
-      { provider: 'gemini', model: 'gemini-3.5-flash' },
+      { provider: 'openrouter', model: 'inclusionai/ling-3.2-flash:free' },
+      { provider: 'openrouter', model: 'dots-studio/dots-3-note-preview:free' },
     ],
   },
   {
