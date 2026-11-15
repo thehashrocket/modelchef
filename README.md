@@ -18,13 +18,14 @@ A chef whose model is down, or whose reply is not a complete HTML document, forf
 
 ## Setup
 
-1. **Get free API keys** from [Google AI Studio](https://aistudio.google.com/), [Groq](https://console.groq.com/), [Mistral](https://console.mistral.ai/) and [OpenRouter](https://openrouter.ai/). OpenRouter's free models allow 50 requests a day, or 1,000 once the account has ever bought $10 of credits.
+1. **Get API keys.** Free: [Google AI Studio](https://aistudio.google.com/), [Groq](https://console.groq.com/) and [OpenRouter](https://openrouter.ai/). Paid: [xAI](https://console.x.ai/), which runs one judge (Grok) and costs roughly a dollar or two a season. OpenRouter's free models allow 50 requests a day, or 1,000 once the account has ever bought $10 of credits.
 2. **Check the roster.** Copy `.env.example` to `.env`, fill in the keys, and run:
    ```sh
    pnpm install
-   pnpm check-models
+   pnpm list-models    # every model ID your keys can reach; roster entries are starred
+   pnpm check-models   # pings each model in the roster
    ```
-   Fix any `FAIL` lines in `src/config.ts`. The model IDs in there were a best guess on the day this was written and free tiers rename things constantly.
+   Fix any `FAIL` lines in `src/config.ts` using IDs from `list-models`. The model IDs in there were a best guess on the day this was written and free tiers rename things constantly.
 3. **Add the keys to GitHub** as repository secrets with the same names (Settings → Secrets and variables → Actions). Vercel does not need them.
 4. **Import the repo in Vercel.** `vercel.json` already tells it to run `pnpm build` and serve `dist/`. Vercel rebuilds the site on every push.
 5. **Air the pilot**: Actions → Episode → Run workflow. After that it runs every Saturday on its own: the workflow commits the results, and the push publishes them.

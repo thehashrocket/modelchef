@@ -12,7 +12,8 @@
     "build": "tsx src/build-site.ts",
     "build:mock": "DATA_DIR=.mock-data tsx src/build-site.ts",
     "check-models": "tsx --env-file-if-exists=.env src/check-models.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "list-models": "tsx --env-file-if-exists=.env src/list-models.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -11,7 +11,7 @@ function app(tag: string): string {
   const hue = Math.floor(Math.random() * 360);
   // One mock chef breaks the rules so the mechanical checks get exercised.
   const sloppy =
-    tag === 'kimi'
+    tag === 'ernie'
       ? `fetch('https://example.com/data.json').catch(()=>{}); console.error('mock: something broke');`
       : '';
   return `<presentation>Judges, today I have made you ${title}. I chose it because clicking is universal. After your last notes, I made the button a different colour.</presentation>

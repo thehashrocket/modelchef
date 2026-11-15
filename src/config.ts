@@ -1,17 +1,20 @@
 // Everything you are likely to tune lives in this file: the roster, the
 // judges, the themes, and the scoring weights.
 //
-// MODEL IDS GO STALE. Free tiers rename and retire models constantly. Run
-// `pnpm check-models` after editing this file and before the first live run.
+// Roster last checked against live `pnpm list-models` output on 2026-11-15.
+// MODEL IDS GO STALE. Free tiers rename and retire models constantly.
+// `pnpm list-models` prints what each of your keys can actually reach, and
+// `pnpm check-models` pings every model named here. Run both before the first
+// live run and whenever a chef starts forfeiting.
 
-export type ProviderId = 'gemini' | 'groq' | 'mistral' | 'openrouter';
+export type ProviderId = 'gemini' | 'groq' | 'openrouter' | 'xai';
 
-/** All four speak the OpenAI chat-completions format. */
+/** Gemini, Groq and OpenRouter are free tiers; xAI is paid. All four speak the OpenAI chat-completions format. */
 export const PROVIDERS: Record<ProviderId, { baseUrl: string; keyEnv: string }> = {
   gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', keyEnv: 'GEMINI_API_KEY' },
   groq: { baseUrl: 'https://api.groq.com/openai/v1', keyEnv: 'GROQ_API_KEY' },
-  mistral: { baseUrl: 'https://api.mistral.ai/v1', keyEnv: 'MISTRAL_API_KEY' },
   openrouter: { baseUrl: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
+  xai: { baseUrl: 'https://api.x.ai/v1', keyEnv: 'XAI_API_KEY' },
 };
 
 export interface ModelRef {
@@ -55,53 +58,46 @@ export const DATA_DIR = process.env.DATA_DIR ?? 'data';
 export const CONTESTANTS: Contestant[] = [
   {
     id: 'gemini-flash',
-    name: 'Gemini 2.5 Flash',
+    name: 'Gemini 3.8 Flash',
     family: 'google',
-    models: [{ provider: 'gemini', model: 'gemini-2.5-flash' }],
+    models: [{ provider: 'gemini', model: 'gemini-3.8-flash' }],
     maxTokens: 32000,
   },
   {
-    id: 'llama',
-    name: 'Llama 3.3 70B',
-    family: 'meta',
-    models: [
-      { provider: 'groq', model: 'llama-3.3-70b-versatile' },
-      { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free' },
-    ],
+    id: 'gemma',
+    name: 'Gemma 4 31B',
+    family: 'google',
+    models: [{ provider: 'gemini', model: 'gemma-4-31b-it' }],
     maxTokens: 16000,
   },
   {
     id: 'gpt-oss',
     name: 'GPT-OSS 120B',
     family: 'openai',
-    models: [
-      { provider: 'groq', model: 'openai/gpt-oss-120b' },
-      { provider: 'openrouter', model: 'openai/gpt-oss-120b:free' },
-    ],
+    models: [{ provider: 'groq', model: 'openai/gpt-oss-120b' }],
     maxTokens: 24000,
   },
+  // Groq's free tier caps Qwen at 1,000 output tokens a minute, which cannot
+  // fit an app, so the sixth seat went to an OpenRouter model instead.
   {
-    id: 'mistral-large',
-    name: 'Mistral Large',
-    family: 'mistral',
-    models: [{ provider: 'mistral', model: 'mistral-large-latest' }],
+    id: 'ernie',
+    name: 'ERNIE 5.5 Flash',
+    family: 'baidu',
+    models: [{ provider: 'openrouter', model: 'baidu/ernie-5.5-flash-preview:free' }],
     maxTokens: 16000,
   },
   {
-    id: 'qwen-coder',
-    name: 'Qwen3 Coder',
-    family: 'alibaba',
-    models: [{ provider: 'openrouter', model: 'qwen/qwen3-coder:free' }],
+    id: 'nemotron',
+    name: 'Nemotron 3 Ultra',
+    family: 'nvidia',
+    models: [{ provider: 'openrouter', model: 'nvidia/nemotron-3-ultra-550b-a55b:free' }],
     maxTokens: 16000,
   },
   {
-    id: 'kimi',
-    name: 'Kimi K2',
-    family: 'moonshot',
-    models: [
-      { provider: 'groq', model: 'moonshotai/kimi-k2-instruct-0905' },
-      { provider: 'openrouter', model: 'moonshotai/kimi-k2:free' },
-    ],
+    id: 'cohere-north',
+    name: 'Cohere North Mini Code',
+    family: 'cohere',
+    models: [{ provider: 'openrouter', model: 'cohere/north-mini-code:free' }],
     maxTokens: 16000,
   },
 ];
@@ -116,29 +112,39 @@ export const JUDGES: Judge[] = [
       'You run a small business and have no patience for demos. You ask one question of every dish: would a real person open this a second time? You are blunt, specific, and fair.',
     vision: true,
     sourceChars: 60000,
-    models: [{ provider: 'gemini', model: 'gemini-2.5-pro' }],
+    // Gemini's Pro models are not served on the free tier (quota error), so
+    // this seat runs on Flash, with an older Flash as cover for busy spells.
+    models: [
+      { provider: 'gemini', model: 'gemini-3.8-flash' },
+      { provider: 'gemini', model: 'gemini-3.5-flash' },
+    ],
   },
   {
     id: 'craftsman',
     name: 'The Craftsman',
-    family: 'mistral',
+    family: 'xai',
     lens: 'craft',
     persona:
       'You are a veteran front-end engineer and designer. You notice spacing, contrast, focus states, empty states, and what happens at phone width. Sloppy plating offends you; restraint impresses you.',
     vision: true,
     sourceChars: 40000,
-    models: [{ provider: 'mistral', model: 'mistral-medium-latest' }],
+    // The one paid seat on the panel. Judging is mostly reading, so it is cheap.
+    models: [{ provider: 'xai', model: 'grok-4.5' }],
   },
   {
     id: 'maverick',
     name: 'The Maverick',
-    family: 'meta',
+    family: 'nvidia',
     lens: 'originality',
     persona:
       'You have seen ten thousand to-do lists and pomodoro timers and you are tired. You reward ideas you have not seen before and penalise anything that chases last week\'s winner. A flawed surprise beats a polished cliche.',
-    vision: false,
-    sourceChars: 16000,
-    models: [{ provider: 'groq', model: 'llama-3.3-70b-versatile' }],
+    vision: true,
+    sourceChars: 30000,
+    // A judge may fall back to a sibling model: the seat matters, not the exact weights.
+    models: [
+      { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
+      { provider: 'openrouter', model: 'nvidia/nemotron-3.5-lightning:free' },
+    ],
   },
 ];
 
