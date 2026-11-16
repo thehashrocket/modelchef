@@ -95,9 +95,21 @@ export async function chat(
 /** Pulls the first JSON object out of a reply that may be wrapped in prose or fences. */
 export function parseJson<T>(text: string): T {
   const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('no JSON object in reply');
-  return JSON.parse(text.slice(start, end + 1)) as T;
+  if (start < 0) throw new Error('no JSON object in reply');
+  // Walk to the brace that closes the first object, so prose, code fences or a
+  // second object after it cannot break the parse.
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === '\\') i++;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') inString = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return JSON.parse(text.slice(start, i + 1)) as T;
+  }
+  throw new Error('JSON object in reply is not closed');
 }
 
 /**

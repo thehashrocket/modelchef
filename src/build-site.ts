@@ -4,6 +4,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONTESTANTS, DATA_DIR, JUDGES } from './config';
+import { challengeText, RULES } from './prompts';
 import { average, type Entry, type Episode, type SeasonState } from './state';
 
 const OUT = 'dist';
@@ -12,6 +13,13 @@ const esc = (s: unknown) =>
 const chefName = (id: string) => CONTESTANTS.find((c) => c.id === id)?.name ?? id;
 const judgeName = (id: string) => JUDGES.find((j) => j.id === id)?.name ?? id;
 const pad = (n: number) => String(n).padStart(2, '0');
+/** A folder named "pilot" is a trial run: shown on the site, never counted. */
+const isPilot = (season: string) => season === 'pilot';
+const seasonLabel = (season: string) => {
+  if (isPilot(season)) return 'Pilot';
+  const m = /^season-0*(\d+)$/.exec(season);
+  return m ? `Season ${m[1]}` : season;
+};
 const TYPE_LABEL = { 'mystery-box': 'Mystery Box', invention: 'Invention Test', finale: 'Finale' } as const;
 
 const CSP =
@@ -38,6 +46,7 @@ h1 span{color:var(--accent)}
 .status{margin-top:18px;font-weight:600}
 h2{font:700 1.6rem/1.2 Georgia,serif;margin:56px 0 6px}
 h3{font:700 1.25rem/1.25 Georgia,serif;margin:0}
+h3.pilot{font-size:1.4rem;margin:18px 0 6px}
 .sub{color:var(--muted);margin:0 0 18px}
 table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line)}
@@ -68,6 +77,9 @@ blockquote{margin:10px 0 0;padding-left:12px;border-left:3px solid var(--line)}
 blockquote b{display:block}
 blockquote small{color:var(--muted)}
 .play{margin-top:auto;font-weight:700}
+.brief{margin:0 0 18px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+.brief p{margin:10px 0 0}
+.brief pre{margin:10px 0 0;white-space:pre-wrap;font:inherit;font-size:.9rem;color:var(--muted)}
 .pressure{margin-top:18px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:16px 18px}
 .pressure p{margin:6px 0}
 .pressure ul{margin:8px 0 0;padding-left:20px}
@@ -128,7 +140,7 @@ function card(season: string, ep: Episode, e: Entry): string {
 
   const m = e.mech;
   const mech = m
-    ? `<div class="mech">Machine check ${m.score}/10 · ${(m.bytes / 1024).toFixed(0)} KB · ${m.consoleErrors.length} console error${m.consoleErrors.length === 1 ? '' : 's'} · ${m.networkAttempts.length} network attempt${m.networkAttempts.length === 1 ? '' : 's'}${m.mobileOverflow ? ' · overflows on phone' : ''}</div>`
+    ? `<div class="mech">Machine check ${m.score}/10 · ${(m.bytes / 1024).toFixed(0)} KB · ${m.consoleErrors.length} console error${m.consoleErrors.length === 1 ? '' : 's'} · ${m.networkAttempts.length} network attempt${m.networkAttempts.length === 1 ? '' : 's'}${m.mobileOverflow ? ' · overflows on phone' : ''}${m.ingredient === 'missing' ? ' · secret ingredient missing' : ''}</div>`
     : '';
 
   const notes = e.judges.length
@@ -172,6 +184,14 @@ function pressureBlock(season: string, ep: Episode): string {
 ${votes ? `<ul>${votes}</ul>` : ''}</div>`;
 }
 
+/** What the chefs were actually told: the episode's challenge, then the standing house rules. */
+function briefBlock(ep: Episode): string {
+  // Episodes recorded before the brief was stored are rebuilt from their type and theme.
+  const brief =
+    ep.brief ?? challengeText({ type: ep.type, theme: ep.theme, ingredient: ep.ingredient?.text ?? null, guest: ep.guestJudge ?? null });
+  return `<details class="brief"><summary>The brief the chefs were given</summary><p>${esc(brief).replace(/\n+/g, '</p><p>')}</p><pre>${esc(RULES)}</pre><p>Each chef also sees its own record, the judges' notes on its last dish, the standings, and what won the previous episode.</p></details>`;
+}
+
 function seasonSection(season: string, state: SeasonState, episodes: Episode[]): string {
   const left = Object.values(state.contestants).filter((c) => c.status === 'active').length;
   const rows = Object.entries(state.contestants)
@@ -193,15 +213,31 @@ function seasonSection(season: string, state: SeasonState, episodes: Episode[]):
     .reverse()
     .map((ep) => {
       const theme = ep.theme ? ` &ldquo;${esc(ep.theme)}&rdquo;` : '';
-      const by = ep.themeChosenBy ? ` Theme chosen by ${esc(chefName(ep.themeChosenBy))}.` : '';
-      return `<h2>Episode ${ep.number}: ${TYPE_LABEL[ep.type]}${theme}</h2>
-<p class="sub">${esc(ep.date)}.${by} ${ep.entries.length} dishes, judged blind.</p>
+      const by = ep.themeChosenBy
+        ? ` Theme chosen by ${esc(chefName(ep.themeChosenBy))}.`
+        : ep.guestJudge && ep.theme
+          ? ` Brief set by ${esc(ep.guestJudge)}.`
+          : ep.guestJudge
+            ? ` With ${esc(ep.guestJudge)}.`
+            : '';
+      const twist = ep.ingredient ? `<p class="sub"><b>Secret ingredient:</b> ${esc(ep.ingredient.text)}</p>` : '';
+      const title = isPilot(season) ? 'Pilot' : `Episode ${ep.number}`;
+      return `<h2>${title}: ${TYPE_LABEL[ep.type]}${theme}</h2>
+<p class="sub">${esc(ep.date)}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}
+${briefBlock(ep)}
 <div class="grid">${ep.entries.map((e) => card(season, ep, e)).join('')}</div>
 ${pressureBlock(season, ep)}`;
     })
     .join('');
 
-  return `<h2>Standings, ${esc(season)}</h2>
+  // A pilot has no standings: its scores never counted toward anything.
+  if (isPilot(season)) {
+    return `<h2>The pilot</h2>
+<p class="sub">A trial run before season 1, kept for the record. It did not count: no standings, no immunity, and the chef it sent home was back for the real season.</p>
+${eps.replace('<h2>', '<h3 class="pilot">').replace('</h2>', '</h3>')}`;
+  }
+
+  return `<h2>Standings, ${esc(seasonLabel(season))}</h2>
 <p class="sub">Season average of each chef's episode scores, out of 10.</p>
 <div class="scroll"><table><thead><tr><th>Chef</th><th>Status</th><th class="num">Average</th><th class="num">Wins</th><th class="num">Dishes</th></tr></thead><tbody>${rows}</tbody></table></div>
 ${eps}`;
@@ -231,7 +267,10 @@ function main() {
   mkdirSync(OUT, { recursive: true });
 
   const seasons = existsSync(DATA_DIR)
-    ? readdirSync(DATA_DIR).filter((s) => existsSync(join(DATA_DIR, s, 'state.json'))).sort().reverse()
+    ? readdirSync(DATA_DIR)
+        .filter((s) => existsSync(join(DATA_DIR, s, 'state.json')))
+        // Newest season first, the pilot always last.
+        .sort((a, b) => Number(isPilot(a)) - Number(isPilot(b)) || b.localeCompare(a))
     : [];
 
   let status = 'The first episode has not aired yet.';
@@ -243,11 +282,11 @@ function main() {
     );
     episodes.forEach((ep) => publishEpisode(season, ep));
     sections.push(seasonSection(season, state, episodes));
-    if (i === 0) {
+    if (i === 0 && !isPilot(season)) {
       const left = Object.values(state.contestants).filter((c) => c.status === 'active').length;
       status = state.champion
-        ? `${chefName(state.champion)} won ${season}.`
-        : `${season}, ${state.episodes.length} episode${state.episodes.length === 1 ? '' : 's'} in. ${left} chefs remain.`;
+        ? `${chefName(state.champion)} won ${seasonLabel(season)}.`
+        : `${seasonLabel(season)}, ${state.episodes.length} episode${state.episodes.length === 1 ? '' : 's'} in. ${left} chefs remain.`;
     }
   }
 

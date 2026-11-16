@@ -1,8 +1,9 @@
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Browser } from 'playwright';
-import type { MechReport } from './state';
+import type { SecretIngredient } from './config';
+import type { IngredientCheck, MechReport } from './state';
 
 /**
  * Opens a dish in headless Chromium with the network cut off, records what it
@@ -12,7 +13,7 @@ export async function capture(
   browser: Browser,
   htmlPath: string,
   shotPrefix: string,
-  meta: { hasTitle: boolean; hasDescription: boolean },
+  meta: { hasTitle: boolean; hasDescription: boolean; ingredient?: SecretIngredient | null },
 ): Promise<{ mech: MechReport; shots: { desktop: string; mobile: string } }> {
   const consoleErrors: string[] = [];
   const networkAttempts: string[] = [];
@@ -57,8 +58,16 @@ export async function capture(
     await context.close();
   }
 
+  const bytes = statSync(htmlPath).size;
+  let ingredient: IngredientCheck | undefined;
+  if (meta.ingredient) {
+    const test = meta.ingredient.test;
+    ingredient = !test ? 'unchecked' : test(readFileSync(htmlPath, 'utf8'), bytes) ? 'present' : 'missing';
+  }
+
   let score = 10;
   if (blank) score -= 5;
+  if (ingredient === 'missing') score -= 3;
   if (networkAttempts.length) score -= 4;
   score -= Math.min(consoleErrors.length, 3);
   if (mobileOverflow) score -= 1;
@@ -66,13 +75,14 @@ export async function capture(
 
   return {
     mech: {
-      bytes: statSync(htmlPath).size,
+      bytes,
       consoleErrors,
       networkAttempts,
       mobileOverflow,
       blank,
       hasTitle: meta.hasTitle,
       hasDescription: meta.hasDescription,
+      ...(ingredient ? { ingredient } : {}),
       score: Math.max(0, score),
     },
     shots,

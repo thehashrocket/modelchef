@@ -14,6 +14,11 @@ Odd episodes are a **Mystery Box** (themed), even episodes are an **Invention Te
 
 Final score = judges × 0.8 + machine check × 0.2, both out of 10.
 
+### Twists
+
+- **Secret ingredient.** From episode 3 on, each Mystery Box adds a required element on top of the theme: sound, canvas only, under 8 KB, and so on. It is never repeated within a season. Where a machine can check it, a missing ingredient costs three points on the machine check; either way the judges are told to cap the theme score at 4 for a dish that ignores it. The list is `SECRET_INGREDIENTS` in `src/config.ts`.
+- **Guest judge.** In the Finale, a frontier model sets the brief both finalists cook to, then scores them alongside the regular panel with all four criteria weighted equally. It is the one paid call besides Grok, billed to OpenRouter credits, and it only reads two dishes. Set `GUEST_JUDGE` in `src/config.ts`; find the model ID with `pnpm list-models <name>`. A guest from the same lab as a finalist sets the brief but does not score.
+
 A chef whose model is down, or whose reply is not a complete HTML document, forfeits the round with a score of zero. It still gets its pressure test, so one bad API day is survivable. Two is not.
 
 ## Setup

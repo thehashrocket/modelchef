@@ -1,7 +1,7 @@
 // Pings every model in the roster with the same output budget an episode
 // uses, so dead IDs, missing keys and too-large max_tokens values show up
 // before an episode does. Run after editing src/config.ts: `pnpm check-models`.
-import { CONTESTANTS, JUDGES, PROVIDERS, type ModelRef } from './config';
+import { CONTESTANTS, GUEST_JUDGE, JUDGES, PROVIDERS, type ModelRef } from './config';
 import { chat } from './llm';
 
 /** Judges are always called with this budget (see episode.ts). */
@@ -14,7 +14,7 @@ const add = (who: string, ref: ModelRef, maxTokens: number) => {
   checks.set(key, { ref, maxTokens: Math.max(maxTokens, prev?.maxTokens ?? 0), usedBy: [...(prev?.usedBy ?? []), who] });
 };
 for (const c of CONTESTANTS) for (const ref of c.models) add(c.id, ref, c.maxTokens);
-for (const j of JUDGES) for (const ref of j.models) add(j.id, ref, JUDGE_MAX_TOKENS);
+for (const j of [...JUDGES, ...(GUEST_JUDGE ? [GUEST_JUDGE] : [])]) for (const ref of j.models) add(j.id, ref, JUDGE_MAX_TOKENS);
 
 // Extra arguments are tried as chef candidates, e.g.
 //   pnpm check-models openrouter/some-lab/some-model:free

@@ -5,7 +5,7 @@ import { average, type EpisodeType, type MechReport, type SeasonState } from './
 
 const nameOf = (id: string) => CONTESTANTS.find((c) => c.id === id)?.name ?? id;
 
-const RULES = `HOUSE RULES (breaking one costs points; some are checked by machine)
+export const RULES = `HOUSE RULES (breaking one costs points; some are checked by machine)
 - Deliver ONE self-contained HTML file. All CSS and JavaScript inline.
 - No libraries, no CDNs, no fonts or images from the network. Zero network requests of any kind.
 - It must work the moment it opens: preload demo content so the judges see it in use, never an empty state.
@@ -29,14 +29,33 @@ Reply with the complete HTML document and nothing else. Start with <!DOCTYPE htm
 const JUDGING = `THE JUDGES
 Three judges taste every dish blind. One cares most about usefulness, one about craft and polish, one about originality. They also see screenshots at desktop and phone width and a machine report of console errors and network attempts.`;
 
-function challengeText(type: EpisodeType, theme: string | null): string {
-  if (type === 'mystery-box') return `MYSTERY BOX. Every chef must build around this theme: "${theme}". Interpret it however you like, but a judge should see the connection without being told.`;
-  if (type === 'finale') return 'THE FINALE. Two chefs remain. Build your signature dish: the single best small web app you can make. No theme.';
+/** Everything that defines what the chefs were asked to make this episode. */
+export interface Challenge {
+  type: EpisodeType;
+  theme: string | null;
+  /** Secret ingredient text, Mystery Box only. */
+  ingredient: string | null;
+  /** Guest judge's name when they set the Finale brief. */
+  guest: string | null;
+}
+
+export function challengeText(c: Challenge): string {
+  if (c.type === 'mystery-box') {
+    const box = `MYSTERY BOX. Every chef must build around this theme: "${c.theme}". Interpret it however you like, but a judge should see the connection without being told.`;
+    return c.ingredient
+      ? `${box}\n\nSECRET INGREDIENT. On top of the theme, every dish must obey this: ${c.ingredient} A dish that ignores it is marked down hard, by the judges and by machine.`
+      : box;
+  }
+  if (c.type === 'finale') {
+    return c.theme
+      ? `THE FINALE. Two chefs remain. ${c.guest ?? 'The guest judge'} has set the final brief: "${c.theme}". Build your signature dish to that brief: the single best small web app you can make.`
+      : 'THE FINALE. Two chefs remain. Build your signature dish: the single best small web app you can make. No theme.';
+  }
   return 'INVENTION TEST. No theme. Build whatever you believe will win.';
 }
 
 /** What a chef is told before cooking: the brief, their record, their feedback, the standings. */
-export function cookPrompt(chef: Contestant, n: number, type: EpisodeType, theme: string | null, state: SeasonState): Msg[] {
+export function cookPrompt(chef: Contestant, n: number, challenge: Challenge, state: SeasonState): Msg[] {
   const me = state.contestants[chef.id]!;
   const active = Object.entries(state.contestants).filter(([, c]) => c.status === 'active');
 
@@ -69,7 +88,7 @@ export function cookPrompt(chef: Contestant, n: number, type: EpisodeType, theme
 
   const user = `EPISODE ${n} of ModelChef, season ${state.season}. ${active.length} chefs remain.
 
-${challengeText(type, theme)}
+${challengeText(challenge)}
 
 ${RULES}
 
@@ -113,6 +132,7 @@ function mechText(m: MechReport): string {
     `Network attempts (forbidden): ${m.networkAttempts.length ? m.networkAttempts.slice(0, 5).join(' | ') : 'none'}`,
     `Horizontal overflow at phone width: ${m.mobileOverflow ? 'yes' : 'no'}`,
     `Rendered blank: ${m.blank ? 'yes' : 'no'}`,
+    ...(m.ingredient && m.ingredient !== 'unchecked' ? [`Secret ingredient (machine check): ${m.ingredient}`] : []),
   ].join('\n');
 }
 
@@ -135,11 +155,11 @@ export interface Dish {
 const clip = (source: string, max: number) =>
   source.length > max ? `${source.slice(0, max)}\n<!-- source truncated for the judge: ${source.length - max} more characters -->` : source;
 
-export function judgePrompt(judge: Judge, type: EpisodeType, theme: string | null, dish: Dish): Msg[] {
+export function judgePrompt(judge: Judge, challenge: Challenge, dish: Dish): Msg[] {
   const text = `You are judging one dish in a ModelChef episode. You do not know which chef made it, and you should not guess.
 
 THE CHALLENGE
-${challengeText(type, theme)}
+${challengeText(challenge)}
 
 THE DISH: ${dish.label}
 Name: ${dish.title}
@@ -160,7 +180,7 @@ Score each criterion from 1 to 10. Use the whole range: 5 is competent and forge
 - usefulness: would a real person come back to this?
 - craft: visual polish, layout, responsiveness, attention to detail, code that does what it claims
 - originality: have you seen this a hundred times, or is it a fresh idea?
-- theme: how well it answers the challenge (for a challenge with no theme, score how well it works as a complete, finished thing)
+- theme: how well it answers the challenge (for a challenge with no theme, score how well it works as a complete, finished thing)${challenge.ingredient ? '. Check the secret ingredient yourself: a dish that ignores it cannot score above 4 here' : ''}
 
 Reply with JSON only, in exactly this shape:
 {"scores":{"usefulness":0,"craft":0,"originality":0,"theme":0},"critique":"two or three sentences in your own voice, specific to this dish","improve":"one concrete thing the chef should do differently next time"}`;
@@ -202,6 +222,17 @@ export function themePrompt(chef: Contestant, usedThemes: string[]): Msg[] {
     {
       role: 'user',
       content: `Your prize: you choose the theme for the next Mystery Box, which every remaining chef (you included) must build a small single-file web app around.\n\nPick a theme that is short (under twelve words), open to interpretation, and not a specific app idea. Already used this season: ${usedThemes.length ? usedThemes.map((t) => `"${t}"`).join(', ') : 'none'}.\n\nReply with JSON only: {"theme":"..."}`,
+    },
+  ];
+}
+
+/** The guest judge writes the brief the two finalists cook to. */
+export function guestBriefPrompt(guest: Judge, usedThemes: string[]): Msg[] {
+  return [
+    { role: 'system', content: `You are ${guest.name}, guest judge for the finale of ModelChef, a cooking competition where the dishes are small web apps. ${guest.persona}` },
+    {
+      role: 'user',
+      content: `Two chefs remain. Each will build one self-contained HTML file: a small web app with no libraries and no network access, usable on a phone. You set the brief they both cook to, and then you will judge the results.\n\nWrite a brief of under 25 words. It should be open enough that two chefs could answer it in completely different ways, and demanding enough to separate a good dish from a great one. Do not describe a specific app. Themes already used this season: ${usedThemes.length ? usedThemes.map((t) => `"${t}"`).join(', ') : 'none'}.\n\nReply with JSON only: {"brief":"..."}`,
     },
   ];
 }

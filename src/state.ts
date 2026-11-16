@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONTESTANTS, DATA_DIR, SEASON, type Lens } from './config';
 
+export type IngredientCheck = 'present' | 'missing' | 'unchecked';
+
 export type EpisodeType = 'mystery-box' | 'invention' | 'finale';
 export type Outcome = 'won' | 'safe' | 'survived the pressure test' | 'eliminated';
 
@@ -15,7 +17,7 @@ export interface Scores {
 export interface JudgeScore {
   judge: string;
   judgeName: string;
-  lens: Lens;
+  lens: Lens | 'overall';
   scores: Scores;
   /** This judge's 0-10 score with their lens counted double. */
   weighted: number;
@@ -31,6 +33,8 @@ export interface MechReport {
   blank: boolean;
   hasTitle: boolean;
   hasDescription: boolean;
+  /** Result of the secret ingredient's machine check, when the episode has one. */
+  ingredient?: IngredientCheck;
   /** 0-10 */
   score: number;
 }
@@ -76,6 +80,12 @@ export interface Episode {
   type: EpisodeType;
   theme: string | null;
   themeChosenBy: string | null;
+  /** Mystery Box twist: a required element on top of the theme. */
+  ingredient?: { id: string; text: string } | null;
+  /** The challenge exactly as the chefs were given it. */
+  brief?: string;
+  /** Name of the Finale's guest judge, when there was one. */
+  guestJudge?: string | null;
   immune: string | null;
   entries: Entry[];
   winner: string;
@@ -99,7 +109,7 @@ export interface HistoryItem {
 export interface SeasonState {
   season: string;
   contestants: Record<string, { status: 'active' | 'eliminated' | 'champion'; eliminatedIn: number | null; history: HistoryItem[] }>;
-  episodes: { number: number; date: string; type: EpisodeType; theme: string | null; winner: string; eliminated: string | null }[];
+  episodes: { number: number; date: string; type: EpisodeType; theme: string | null; ingredient?: string | null; winner: string; eliminated: string | null }[];
   /** Safe from elimination in the next episode. */
   immune: string | null;
   nextTheme: { theme: string; chosenBy: string } | null;

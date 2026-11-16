@@ -6,9 +6,21 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Browser } from 'playwright';
 import { capture } from './capture';
-import { CONTESTANTS, JUDGES, MYSTERY_THEMES, PRESSURE_SPECS, SCORING, type Contestant } from './config';
+import {
+  CONTESTANTS,
+  GUEST_JUDGE,
+  JUDGES,
+  MYSTERY_THEMES,
+  PRESSURE_SPECS,
+  SCORING,
+  SECRET_INGREDIENT_FROM_EPISODE,
+  SECRET_INGREDIENTS,
+  type Contestant,
+  type Judge,
+  type SecretIngredient,
+} from './config';
 import { chat, extractHtml, parseJson } from './llm';
-import { cookPrompt, duelPrompt, judgePrompt, pressurePrompt, themePrompt, type Dish } from './prompts';
+import { challengeText, cookPrompt, duelPrompt, guestBriefPrompt, judgePrompt, pressurePrompt, themePrompt, type Challenge, type Dish } from './prompts';
 import {
   episodeDir,
   loadState,
@@ -94,36 +106,45 @@ async function cook(chef: Contestant, messages: Msg[], path: string): Promise<Co
 
 const clamp = (v: unknown) => Math.min(10, Math.max(1, Math.round(Number(v)) || 1));
 
-async function judgeDish(type: EpisodeType, theme: string | null, dish: Dish, chefFamily: string) {
+async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefFamily: string) {
   const judges: JudgeScore[] = [];
   const abstained: Entry['abstained'] = [];
-  for (const judge of JUDGES) {
+  for (const judge of panel) {
     if (judge.family === chefFamily) {
       abstained.push({ judge: judge.id, reason: 'Same model family as the chef.' });
       continue;
     }
-    try {
-      const { text } = await chat(judge.models, judgePrompt(judge, type, theme, dish), { maxTokens: 8000, temperature: 0.4, kind: 'judge' });
-      const reply = parseJson<{ scores?: Partial<Scores>; critique?: string; improve?: string }>(text);
-      const scores: Scores = {
-        usefulness: clamp(reply.scores?.usefulness),
-        craft: clamp(reply.scores?.craft),
-        originality: clamp(reply.scores?.originality),
-        theme: clamp(reply.scores?.theme),
-      };
-      const weighted = (scores.usefulness + scores.craft + scores.originality + scores.theme + scores[judge.lens]) / 5;
-      judges.push({
-        judge: judge.id,
-        judgeName: judge.name,
-        lens: judge.lens,
-        scores,
-        weighted,
-        critique: String(reply.critique ?? '').slice(0, 600),
-        improve: String(reply.improve ?? '').slice(0, 300),
-      });
-    } catch (err) {
-      abstained.push({ judge: judge.id, reason: `Unavailable: ${(err as Error).message.slice(0, 200)}` });
+    // A judge whose reply cannot be read gets one more try before sitting out.
+    let failure = '';
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const { text } = await chat(judge.models, judgePrompt(judge, challenge, dish), { maxTokens: 8000, temperature: 0.4, kind: 'judge' });
+        const reply = parseJson<{ scores?: Partial<Scores>; critique?: string; improve?: string }>(text);
+        if (!reply.scores) throw new Error('reply has no scores');
+        const scores: Scores = {
+          usefulness: clamp(reply.scores.usefulness),
+          craft: clamp(reply.scores.craft),
+          originality: clamp(reply.scores.originality),
+          theme: clamp(reply.scores.theme),
+        };
+        const sum = scores.usefulness + scores.craft + scores.originality + scores.theme;
+        const weighted = judge.lens === 'overall' ? sum / 4 : (sum + scores[judge.lens]) / 5;
+        judges.push({
+          judge: judge.id,
+          judgeName: judge.name,
+          lens: judge.lens,
+          scores,
+          weighted,
+          critique: String(reply.critique ?? '').slice(0, 600),
+          improve: String(reply.improve ?? '').slice(0, 300),
+        });
+        failure = '';
+        break;
+      } catch (err) {
+        failure = (err as Error).message.slice(0, 200);
+      }
     }
+    if (failure) abstained.push({ judge: judge.id, reason: `Unavailable: ${failure}` });
   }
   return { judges, abstained };
 }
@@ -203,9 +224,37 @@ async function main() {
   // Immunity lapses once three chefs remain, so the semifinal always has a real pressure test.
   const immune = active.length <= 3 ? null : state.immune;
 
+  // Mystery Box twist: a secret ingredient on top of the theme, never repeated in a season.
+  let ingredient: SecretIngredient | null = null;
+  if (type === 'mystery-box' && n >= SECRET_INGREDIENT_FROM_EPISODE && SECRET_INGREDIENTS.length) {
+    const used = new Set(state.episodes.map((e) => e.ingredient));
+    const fresh = SECRET_INGREDIENTS.filter((i) => !used.has(i.id));
+    ingredient = pick(fresh.length ? fresh : SECRET_INGREDIENTS);
+  }
+
+  // Finale: the guest judge sets the brief, and scores both dishes unless they
+  // share a model family with a finalist (then they score neither).
+  const guest = type === 'finale' ? GUEST_JUDGE : null;
+  let panel: Judge[] = JUDGES;
+  if (guest) {
+    try {
+      const used = state.episodes.map((e) => e.theme).filter((t): t is string => !!t);
+      const { text } = await chat(guest.models, guestBriefPrompt(guest, used), { maxTokens: 4000, kind: 'theme' });
+      const reply = parseJson<{ brief?: string; theme?: string }>(text);
+      theme = String(reply.brief ?? reply.theme ?? '').trim().slice(0, 240) || null;
+    } catch (err) {
+      log(`  Guest judge could not set a brief (${(err as Error).message.slice(0, 160)}); the finale runs without one.`);
+    }
+    if (active.some((c) => c.family === guest.family)) log(`  ${guest.name} shares a model family with a finalist, so sets the brief but does not score.`);
+    else panel = [...JUDGES, guest];
+  }
+  const challenge: Challenge = { type, theme, ingredient: ingredient?.text ?? null, guest: guest?.name ?? null };
+
   const dir = episodeDir(n);
   for (const sub of ['apps', 'shots', 'pressure']) mkdirSync(join(dir, sub), { recursive: true });
   log(`Episode ${n}: ${type}${theme ? ` ("${theme}")` : ''}, ${active.length} chefs${immune ? `, ${immune} is immune` : ''}`);
+  if (ingredient) log(`  Secret ingredient: ${ingredient.text}`);
+  if (guest) log(`  Guest judge: ${guest.name}`);
 
   const labels = shuffle([...'ABCDEFGHIJKLMNOP'].slice(0, active.length));
   const entries: Entry[] = [];
@@ -216,7 +265,7 @@ async function main() {
   try {
     for (const [i, chef] of active.entries()) {
       const path = join(dir, 'apps', `${chef.id}.html`);
-      const cooked = await cook(chef, cookPrompt(chef, n, type, theme, state), path);
+      const cooked = await cook(chef, cookPrompt(chef, n, challenge, state), path);
       const entry: Entry = {
         contestant: chef.id,
         label: `Dish ${labels[i]}`,
@@ -238,10 +287,10 @@ async function main() {
         continue;
       }
 
-      const { mech, shots } = await capture(browser, path, join(dir, 'shots', chef.id), cooked);
+      const { mech, shots } = await capture(browser, path, join(dir, 'shots', chef.id), { ...cooked, ingredient });
       entry.mech = mech;
       const dish: Dish = { label: entry.label, title: entry.title, pitch: entry.pitch, presentation: entry.presentation, mech, source: readFileSync(path, 'utf8'), shots };
-      Object.assign(entry, await judgeDish(type, theme, dish, chef.family));
+      Object.assign(entry, await judgeDish(panel, challenge, dish, chef.family));
       if (!entry.judges.length) {
         throw new Error(`No judge could score ${chef.id} (${entry.abstained.map((a) => a.reason).join('; ')}). Episode not recorded.`);
       }
@@ -291,7 +340,7 @@ async function main() {
   }
   state.contestants[eliminated]!.status = 'eliminated';
   state.contestants[eliminated]!.eliminatedIn = n;
-  state.episodes.push({ number: n, date, type, theme, winner, eliminated });
+  state.episodes.push({ number: n, date, type, theme, ingredient: ingredient?.id ?? null, winner, eliminated });
   state.nextTheme = type === 'mystery-box' ? null : state.nextTheme;
   state.immune = winner;
   if (type === 'finale') {
@@ -314,7 +363,21 @@ async function main() {
     }
   }
 
-  const episode: Episode = { number: n, date, type, theme, themeChosenBy, immune, entries, winner, pressure, eliminated };
+  const episode: Episode = {
+    number: n,
+    date,
+    type,
+    theme,
+    themeChosenBy,
+    ingredient: ingredient ? { id: ingredient.id, text: ingredient.text } : null,
+    brief: challengeText(challenge),
+    guestJudge: guest?.name ?? null,
+    immune,
+    entries,
+    winner,
+    pressure,
+    eliminated,
+  };
   writeJson(join(dir, 'episode.json'), episode);
   saveState(state);
 

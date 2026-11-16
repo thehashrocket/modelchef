@@ -42,8 +42,8 @@ export interface Judge {
   id: string;
   name: string;
   family: string;
-  /** This judge's own criterion counts double in their score. */
-  lens: Lens;
+  /** This judge's own criterion counts double in their score. 'overall' weighs all four equally. */
+  lens: Lens | 'overall';
   persona: string;
   /** Send screenshots. Costs image tokens; turn off for tight free tiers. */
   vision: boolean;
@@ -113,7 +113,7 @@ export const JUDGES: Judge[] = [
     persona:
       'You run a small business and have no patience for demos. You ask one question of every dish: would a real person open this a second time? You are blunt, specific, and fair.',
     vision: false,
-    sourceChars: 40000,
+    sourceChars: 80000,
     // The fallback is another lab with no chef in the kitchen.
     models: [
       { provider: 'openrouter', model: 'inclusionai/ling-3.2-flash:free' },
@@ -128,7 +128,7 @@ export const JUDGES: Judge[] = [
     persona:
       'You are a veteran front-end engineer and designer. You notice spacing, contrast, focus states, empty states, and what happens at phone width. Sloppy plating offends you; restraint impresses you.',
     vision: true,
-    sourceChars: 40000,
+    sourceChars: 80000,
     // The one paid seat on the panel. Judging is mostly reading, so it is cheap.
     models: [{ provider: 'xai', model: 'grok-4.5' }],
   },
@@ -148,6 +148,53 @@ export const JUDGES: Judge[] = [
     ],
   },
 ];
+
+/**
+ * The Finale's guest judge: a frontier model that sets the final brief and
+ * scores both finalists alongside the regular panel. Paid, via OpenRouter
+ * credits, but it only ever reads two dishes. Leave as null for no guest.
+ *
+ * Pick a lab with no chef in the kitchen: a guest who shares a family with a
+ * finalist still sets the brief but does not score, because scoring one
+ * finalist and not the other would decide the season.
+ * Find the exact model ID with `pnpm list-models <name>`, e.g. `pnpm list-models claude`.
+ */
+export const GUEST_JUDGE: Judge | null = {
+  id: 'guest',
+  name: 'Claude Opus 5.5',
+  // Anthropic has no chef in the kitchen, so this guest can score any finalist.
+  family: 'anthropic',
+  lens: 'overall',
+  persona:
+    'You are the guest of honour at the finale. You have tasted the best there is and you are generous with praise only when it is earned. You judge the whole plate: idea, execution, and whether it answers the brief you set.',
+  vision: true,
+  sourceChars: 60000,
+  // A fixed version on purpose: the "-latest" aliases change underneath you,
+  // and the ":batch" variants do not answer in real time.
+  models: [{ provider: 'openrouter', model: 'anthropic/claude-opus-5.5' }],
+};
+
+export interface SecretIngredient {
+  id: string;
+  /** Told to the chefs and the judges, word for word. */
+  text: string;
+  /** Optional machine check. Returns false when the ingredient is plainly missing. */
+  test?: (html: string, bytes: number) => boolean;
+}
+
+/** Mystery Box episodes add one of these on top of the theme, never repeating within a season. */
+export const SECRET_INGREDIENTS: SecretIngredient[] = [
+  { id: 'sound', text: 'Sound. The dish must make sound using the Web Audio API (no audio files), and sound must matter to how it works.', test: (html) => /AudioContext/.test(html) },
+  { id: 'canvas', text: 'Canvas only. Everything the user sees must be drawn on a single <canvas> element: no HTML buttons, inputs, or text outside it.', test: (html) => /<canvas/i.test(html) },
+  { id: 'tiny', text: 'Tiny kitchen. The whole file must be under 8 KB (8,192 bytes).', test: (_html, bytes) => bytes <= 8192 },
+  { id: 'drag', text: 'Hands on. The main interaction must be dragging things with a mouse or finger.', test: (html) => /pointermove|mousemove|touchmove|dragstart/i.test(html) },
+  { id: 'keyboard', text: 'No mouse. The dish must be fully usable from the keyboard alone, and must show the keys on screen.', test: (html) => /keydown|keyup/i.test(html) },
+  { id: 'wordless', text: 'No words. Apart from numbers, the dish may show no text at all: everything must be communicated with shape, colour, and motion.' },
+  { id: 'one-colour', text: 'One colour. The dish may use a single hue plus black, white, and greys.' },
+];
+
+/** First episode that uses a secret ingredient. Season 1 introduced the twist in episode 3. */
+export const SECRET_INGREDIENT_FROM_EPISODE = 3;
 
 /** Used for Mystery Box episodes until a winner has chosen one. */
 export const MYSTERY_THEMES = [
