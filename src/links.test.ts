@@ -24,6 +24,11 @@ describe('check-links resolution', () => {
   it('skips other sites, mail and data URLs', () => {
     for (const h of ['https://github.com/x', 'http://a.b', 'mailto:a@b.c', 'data:image/png;base64,AA']) assert.equal(resolveLink(page, h).kind, 'skip');
   });
+  it('skips paths Vercel serves itself, from any depth, but still rejects escaping the site', () => {
+    assert.equal(resolveLink(page, '../../../_vercel/insights/script.js').kind, 'skip');
+    assert.equal(resolveLink('index.html', '_vercel/insights/script.js').kind, 'skip');
+    assert.equal(resolveLink('index.html', '../_vercel/insights/script.js').kind, 'error');
+  });
   it('maps absolute links on the site origin back onto the site', () => {
     const o = 'https://example.test';
     assert.deepEqual(resolveLink(page, `${o}/s/season-01/ep-01/og.jpg?v=abc`, o), { kind: 'file', path: 's/season-01/ep-01/og.jpg', fragment: null });

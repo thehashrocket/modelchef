@@ -136,8 +136,16 @@ describe('readCredit', () => {
     assert.equal((await readCredit('k', fake({}, 500))).ok, false);
   });
   it('a timeout is unreadable', async () => {
+    // A request that never answers. AbortSignal.timeout does not keep Node alive, so the
+    // fake holds a ref'd timer until the abort arrives (otherwise the test can end first).
     const hang = ((_u: unknown, init?: RequestInit) =>
-      new Promise((_r, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('timed out'))))) as typeof fetch;
+      new Promise((_r, reject) => {
+        const alive = setTimeout(() => reject(new Error('the timeout never fired')), 5000);
+        init?.signal?.addEventListener('abort', () => {
+          clearTimeout(alive);
+          reject(new Error('timed out'));
+        });
+      })) as typeof fetch;
     const r = await readCredit('k', hang, 20);
     assert.deepEqual(r, { ok: false, why: 'timed out' });
   });

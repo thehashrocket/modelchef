@@ -62,6 +62,8 @@ export function resolveLink(page: string, href: string, origin?: string): Resolv
   if (!path && !fromRoot) return { kind: 'file', path: page, fragment };
   let resolved = posix.normalize(fromRoot ? path || '.' : posix.join(posix.dirname(page), path));
   if (resolved.startsWith('..')) return { kind: 'error', why: 'points outside the site' };
+  // Vercel serves _vercel/ itself (Web Analytics); it is never a file in dist/.
+  if (resolved.startsWith('_vercel/')) return { kind: 'skip' };
   if (resolved === '.' || path.endsWith('/')) resolved = posix.join(resolved, 'index.html');
   return { kind: 'file', path: resolved, fragment };
 }

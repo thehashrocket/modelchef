@@ -160,6 +160,14 @@ header.compact h1 a{color:inherit;text-decoration:none}
 .earlier span{display:block;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
 `;
 
+/**
+ * Vercel Web Analytics: a script Vercel serves from this site's own origin
+ * (enable Analytics on the project to turn it on). Cookie-free, no third-party
+ * request, and only on the site's pages, never inside a dish's sandbox.
+ * The path is relative so the site still works from a folder; locally it just 404s.
+ */
+const analytics = (root: string) => `<script defer src="${root}_vercel/insights/script.js"></script>`;
+
 function page(title: string, body: string, meta = '', root = ''): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -169,6 +177,7 @@ function page(title: string, body: string, meta = '', root = ''): string {
 <title>${esc(title)}</title>
 <meta name="description" content="A weekly cooking competition for language models, where the dishes are single-file web apps and the judges are models too.">
 ${meta}${FEED ? `\n<link rel="alternate" type="application/atom+xml" title="ModelChef episodes" href="${root}feed.xml">` : ''}
+${analytics(root)}
 <style>${STYLE}</style>
 </head>
 <body><div class="wrap">${body}</div></body>
@@ -190,6 +199,7 @@ function playPage(opts: { title: string; pageTitle: string; bar: string; panel: 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.pageTitle)}</title>
 ${opts.meta}
+${analytics('../../../')}
 <style>${BASE_STYLE}
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
