@@ -23,6 +23,8 @@ export interface JudgeScore {
   weighted: number;
   critique: string;
   improve: string;
+  /** The model that answered, as "<provider>/<model>". Absent in records made before it was kept. */
+  model?: string;
 }
 
 export interface MechReport {
@@ -52,17 +54,31 @@ export interface Entry {
   mech: MechReport | null;
   judges: JudgeScore[];
   /** Judges who sat this one out and why. */
-  abstained: { judge: string; reason: string }[];
+  abstained: Abstention[];
   judgeAvg: number;
   total: number;
   rank: number;
 }
+
+export interface Abstention {
+  judge: string;
+  /** The judge's name when it sat out. Absent in older records. */
+  judgeName?: string;
+  reason: string;
+  /** Set when a model replied but the reply could not be used. */
+  model?: string;
+}
+
+/** Why a judge sits out a dish from its own lab. The site recognises this text. */
+export const SAME_FAMILY_REASON = 'Same model family as the chef.';
 
 export interface DuelVote {
   judge: string;
   judgeName: string;
   winner: string | null;
   reason: string;
+  /** The model that answered, when one did. */
+  model?: string;
   /** Chef ids in the order this judge saw them: [Dish A, Dish B]. */
   order?: [string, string];
 }
@@ -88,6 +104,8 @@ export interface Episode {
   brief?: string;
   /** Name of the Finale's guest judge, when there was one. */
   guestJudge?: string | null;
+  /** The model that wrote the guest's brief, when it did. */
+  guestBriefModel?: string | null;
   immune: string | null;
   entries: Entry[];
   winner: string;

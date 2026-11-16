@@ -18,6 +18,13 @@ export interface ChatOpts {
   tag?: string;
 }
 
+export interface ChatResult {
+  text: string;
+  /** The model that answered: the first in the list unless it failed. */
+  used: ModelRef;
+  stop: string;
+}
+
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Free tiers are requests-per-minute limited, and nobody is waiting on this
@@ -39,8 +46,9 @@ export async function chat(
   models: ModelRef[],
   messages: Msg[],
   opts: ChatOpts,
-): Promise<{ text: string; used: ModelRef; stop: string }> {
-  if (process.env.MOCK) return { text: mockChat(messages, opts), used: models[0]!, stop: 'stop' };
+): Promise<ChatResult> {
+  // MOCK_FALLBACK=1 answers from the second model in the list, to exercise fallbacks without keys.
+  if (process.env.MOCK) return { text: mockChat(messages, opts), used: (process.env.MOCK_FALLBACK && models[1]) || models[0]!, stop: 'stop' };
 
   const errors: string[] = [];
   for (const ref of models) {

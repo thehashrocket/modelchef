@@ -19,7 +19,7 @@ import {
   type Judge,
   type SecretIngredient,
 } from './config';
-import { chat, extractHtml, parseJson } from './llm';
+import { chat, extractHtml, parseJson, type ChatResult } from './llm';
 import { challengeText, cookPrompt, duelPrompt, guestBriefPrompt, judgePrompt, pressurePrompt, themePrompt, type Challenge, type Dish, type ShowContext } from './prompts';
 import {
   episodeDir,
@@ -35,12 +35,15 @@ import {
   type PressureTest,
   type Scores,
   type SeasonState,
+  SAME_FAMILY_REASON,
 } from './state';
 import type { Msg } from './llm';
 
 const pick = <T>(xs: T[]): T => xs[Math.floor(Math.random() * xs.length)]!;
 const shuffle = <T>(xs: T[]): T[] => xs.map((x) => [Math.random(), x] as const).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
 const log = (msg: string) => console.log(`[modelchef] ${msg}`);
+/** "<provider>/<model>" for the model that answered a call. */
+const modelOf = (res: ChatResult) => `${res.used.provider}/${res.used.model}`;
 
 const decode = (s: string) =>
   s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, '&');
@@ -112,14 +115,19 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefF
   const abstained: Entry['abstained'] = [];
   for (const judge of panel) {
     if (judge.family === chefFamily) {
-      abstained.push({ judge: judge.id, reason: 'Same model family as the chef.' });
+      abstained.push({ judge: judge.id, judgeName: judge.name, reason: SAME_FAMILY_REASON });
       continue;
     }
     // A judge whose reply cannot be read gets one more try before sitting out.
     let failure = '';
+    // The model behind the last reply, kept even when that reply was unusable.
+    let replied: string | undefined;
     for (let attempt = 1; attempt <= 2; attempt++) {
+      replied = undefined;
       try {
-        const { text } = await chat(judge.models, judgePrompt(judge, challenge, dish, show), { maxTokens: 8000, temperature: 0.4, kind: 'judge' });
+        const res = await chat(judge.models, judgePrompt(judge, challenge, dish, show), { maxTokens: 8000, temperature: 0.4, kind: 'judge', tag: judge.id });
+        replied = modelOf(res);
+        const { text } = res;
         const reply = parseJson<{ scores?: Partial<Scores>; critique?: string; improve?: string }>(text);
         if (!reply.scores) throw new Error('reply has no scores');
         const scores: Scores = {
@@ -138,6 +146,7 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefF
           weighted,
           critique: String(reply.critique ?? '').slice(0, 600),
           improve: String(reply.improve ?? '').slice(0, 300),
+          model: replied,
         });
         failure = '';
         break;
@@ -145,7 +154,7 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefF
         failure = (err as Error).message.slice(0, 200);
       }
     }
-    if (failure) abstained.push({ judge: judge.id, reason: `Unavailable: ${failure}` });
+    if (failure) abstained.push({ judge: judge.id, judgeName: judge.name, reason: `Unavailable: ${failure}`, ...(replied ? { model: replied } : {}) });
   }
   return { judges, abstained };
 }
@@ -190,7 +199,9 @@ async function pressureTest(
     // Kept so the site can say which chef "Dish A" and "Dish B" were in this judge's reason.
     vote.order = [a.id, b.id];
     try {
-      const { text } = await chat(judge.models, duelPrompt(judge, spec, dishes.get(a.id)!, dishes.get(b.id)!, show), { maxTokens: 8000, temperature: 0.3, kind: 'duel' });
+      const res = await chat(judge.models, duelPrompt(judge, spec, dishes.get(a.id)!, dishes.get(b.id)!, show), { maxTokens: 8000, temperature: 0.3, kind: 'duel', tag: judge.id });
+      vote.model = modelOf(res);
+      const { text } = res;
       const reply = parseJson<{ winner?: string; reason?: string }>(text);
       const letter = String(reply.winner ?? '').trim().toUpperCase();
       if (letter !== 'A' && letter !== 'B') throw new Error('no clear winner in reply');
@@ -253,10 +264,13 @@ async function main() {
   // share a model family with a finalist (then they score neither).
   const guest = type === 'finale' ? GUEST_JUDGE : null;
   let panel: Judge[] = JUDGES;
+  let guestBriefModel: string | null = null;
   if (guest) {
     try {
       const used = state.episodes.map((e) => e.theme).filter((t): t is string => !!t);
-      const { text } = await chat(guest.models, guestBriefPrompt(guest, used), { maxTokens: 4000, kind: 'theme' });
+      const res = await chat(guest.models, guestBriefPrompt(guest, used), { maxTokens: 4000, kind: 'theme' });
+      guestBriefModel = modelOf(res);
+      const { text } = res;
       const reply = parseJson<{ brief?: string; theme?: string }>(text);
       theme = String(reply.brief ?? reply.theme ?? '').trim().slice(0, 240) || null;
     } catch (err) {
@@ -390,6 +404,7 @@ async function main() {
     ingredient: ingredient ? { id: ingredient.id, text: ingredient.text } : null,
     brief: challengeText(challenge),
     guestJudge: guest?.name ?? null,
+    guestBriefModel,
     immune,
     entries,
     winner,
