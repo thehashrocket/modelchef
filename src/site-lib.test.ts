@@ -247,7 +247,7 @@ describe('dishChrome', () => {
     assert.match(bar, /by Gemini 3\.8 Flash · #1 · 8\.2\/10/);
     assert.match(bar, /href="play-gpt-oss\.html"[^>]*>Next/);
     assert.ok(!bar.includes('Prev'));
-    assert.match(bar, /<button type="button" class="vbtn" aria-expanded="false" aria-controls="verdict">Verdict<\/button>/);
+    assert.match(bar, /<button type="button" class="vbtn" aria-expanded="false" aria-controls="verdict" data-ev-props="[^"]*">Verdict<\/button>/);
   });
   it('a dish with no judges says so', () => {
     const ep = episode(null);

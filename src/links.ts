@@ -5,7 +5,7 @@ import { posix } from 'node:path';
 
 /** The site's own pages (and its feed). Never dishes under apps/ or pressure/: those are model output. */
 export function isSitePage(rel: string): boolean {
-  return rel === 'index.html' || rel === 'feed.xml' || /^s\/[^/]+\/ep-[^/]+\/(index|play-[^/]+)\.html$/.test(rel);
+  return rel === 'index.html' || rel === 'feed.xml' || rel === 'sitemap.xml' || /^s\/[^/]+\/ep-[^/]+\/(index|play-[^/]+)\.html$/.test(rel);
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
@@ -26,6 +26,8 @@ export function extractLinks(html: string): string[] {
       if (c) out.add(decodeEntities(c[1] ?? c[2] ?? ''));
     }
   }
+  // Sitemap entries are element text.
+  for (const m of html.matchAll(/<loc>([^<]*)<\/loc>/g)) out.add(decodeEntities(m[1] ?? ''));
   return [...out];
 }
 

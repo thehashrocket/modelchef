@@ -13,6 +13,7 @@ import {
   epAnchor,
   epPath,
   esc,
+  evAttrs,
   fmtScores,
   isPilot,
   judgeCss,
@@ -24,6 +25,9 @@ import {
   recapHtml,
   recapText,
   resolveSiteUrl,
+  robotsTxt,
+  sitemapXml,
+  type SitemapUrl,
   SCORE_EXPLAINED,
   seasonLabel,
   TYPE_LABEL,
@@ -158,15 +162,90 @@ header.compact h1 a{color:inherit;text-decoration:none}
 .earlier a{display:block;padding:12px 16px;text-decoration:none;color:var(--ink)}
 .earlier a:hover b{color:var(--accent)}
 .earlier span{display:block;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
+.consent{position:fixed;left:12px;right:12px;bottom:12px;z-index:10;max-width:560px;margin:0 auto;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px 16px;box-shadow:0 8px 24px rgb(0 0 0 / .2);font-size:.92rem}
+.consent[hidden]{display:none}
+.consent p{margin:0}
+.consent-buttons{display:flex;gap:10px;margin-top:10px!important}
+.consent button{min-height:44px;padding:0 16px;border-radius:99px;border:1px solid var(--accent);background:var(--accent);color:var(--card);font:inherit;font-weight:700;cursor:pointer}
+.consent button+button{background:none;color:var(--accent)}
+.linkish{background:none;border:0;padding:10px 0;color:var(--accent);font:inherit;text-decoration:underline;cursor:pointer}
 `;
 
+/** Google Analytics 4 measurement id (GA_MEASUREMENT_ID), resolved in main(). Empty: no GA at all. */
+let GA_ID = '';
+/** Google Search Console HTML-tag verification token (GOOGLE_SITE_VERIFICATION), resolved in main(). */
+let GSC_TOKEN = '';
+
 /**
- * Vercel Web Analytics: a script Vercel serves from this site's own origin
- * (enable Analytics on the project to turn it on). Cookie-free, no third-party
- * request, and only on the site's pages, never inside a dish's sandbox.
- * The path is relative so the site still works from a folder; locally it just 404s.
+ * Analytics for the site's own pages, never inside a dish's sandbox:
+ * - Vercel Web Analytics: cookie-free, served from this site's own origin
+ *   (enable Analytics on the Vercel project). Relative path, so the site still
+ *   works from a folder; locally it just 404s.
+ * - Google Analytics 4, only when GA_MEASUREMENT_ID is set, under Consent Mode v2:
+ *   analytics_storage is denied until the visitor accepts in the banner (see
+ *   consentBanner), so without consent GA sends only cookieless pings.
+ * - One listener sends tracked interactions to both: clicks on [data-ev]
+ *   links/buttons and opening a [data-ev] <details>. window.mcTrack(name, props)
+ *   lets page scripts (the Verdict button) send their own.
  */
-const analytics = (root: string) => `<script defer src="${root}_vercel/insights/script.js"></script>`;
+function analyticsHead(root: string): string {
+  const ga = GA_ID
+    ? `
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){ dataLayer.push(arguments); }
+var mcConsent = null; try { mcConsent = localStorage.getItem('mc-consent'); } catch (e) {}
+gtag('consent', 'default', { analytics_storage: mcConsent === 'granted' ? 'granted' : 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+gtag('js', new Date());
+gtag('config', '${GA_ID}');
+</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>`
+    : '';
+  return `${GSC_TOKEN ? `<meta name="google-site-verification" content="${esc(GSC_TOKEN)}">\n` : ''}<script>
+window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+window.mcTrack = function (name, props) {
+  try { window.va('event', { name: name, data: props || {} }); if (window.gtag) window.gtag('event', name, props || {}); } catch (e) {}
+};
+(function () {
+  function props(el) { try { return JSON.parse(el.getAttribute('data-ev-props') || '{}'); } catch (e) { return {}; } }
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('a[data-ev], button[data-ev]') : null;
+    if (el) window.mcTrack(el.getAttribute('data-ev'), props(el));
+  });
+  document.addEventListener('toggle', function (e) {
+    var el = e.target;
+    if (el && el.open && el.getAttribute && el.getAttribute('data-ev')) window.mcTrack(el.getAttribute('data-ev'), props(el));
+  }, true);
+})();
+</script>${ga}
+<script defer src="${root}_vercel/insights/script.js"></script>`;
+}
+
+/** The cookie choice for Google Analytics: shown until the visitor picks, reopened from the footer. Only when GA is on. */
+function consentBanner(): string {
+  if (!GA_ID) return '';
+  return `<div class="consent" id="consent" role="region" aria-label="Cookie choice" hidden>
+<p>ModelChef uses Google Analytics cookies to count visits, if you allow it. Without them, visits are counted anonymously.</p>
+<p class="consent-buttons"><button type="button" data-consent="granted">Allow</button><button type="button" data-consent="denied">No thanks</button></p>
+</div>
+<script>
+(function () {
+  var box = document.getElementById('consent'), saved = null;
+  try { saved = localStorage.getItem('mc-consent'); } catch (e) {}
+  if (!saved) box.hidden = false;
+  box.addEventListener('click', function (e) {
+    var v = e.target.getAttribute && e.target.getAttribute('data-consent');
+    if (!v) return;
+    try { localStorage.setItem('mc-consent', v); } catch (err) {}
+    if (window.gtag) window.gtag('consent', 'update', { analytics_storage: v });
+    box.hidden = true;
+  });
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-consent-open]')) { box.hidden = false; box.querySelector('button').focus(); }
+  });
+})();
+</script>`;
+}
 
 function page(title: string, body: string, meta = '', root = ''): string {
   return `<!DOCTYPE html>
@@ -177,10 +256,10 @@ function page(title: string, body: string, meta = '', root = ''): string {
 <title>${esc(title)}</title>
 <meta name="description" content="A weekly cooking competition for language models, where the dishes are single-file web apps and the judges are models too.">
 ${meta}${FEED ? `\n<link rel="alternate" type="application/atom+xml" title="ModelChef episodes" href="${root}feed.xml">` : ''}
-${analytics(root)}
+${analyticsHead(root)}
 <style>${STYLE}</style>
 </head>
-<body><div class="wrap">${body}</div></body>
+<body><div class="wrap">${body}</div>${consentBanner()}</body>
 </html>
 `;
 }
@@ -199,7 +278,7 @@ function playPage(opts: { title: string; pageTitle: string; bar: string; panel: 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.pageTitle)}</title>
 ${opts.meta}
-${analytics('../../../')}
+${analyticsHead('../../../')}
 <style>${BASE_STYLE}
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
@@ -229,7 +308,10 @@ ${opts.bar}
 <iframe src="${esc(src)}" sandbox="allow-scripts allow-forms allow-modals allow-downloads allow-pointer-lock" title="${esc(title)}"></iframe>
 <script>
 const b = document.querySelector('.vbtn'), v = document.getElementById('verdict');
-const set = (open) => { v.hidden = !open; b.setAttribute('aria-expanded', String(open)); };
+const set = (open) => {
+  v.hidden = !open; b.setAttribute('aria-expanded', String(open));
+  if (open && window.mcTrack) window.mcTrack('verdict_open', JSON.parse(b.getAttribute('data-ev-props') || '{}'));
+};
 b.addEventListener('click', () => set(v.hidden));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !v.hidden) { set(false); b.focus(); } });
 </script>
@@ -273,7 +355,7 @@ function episodeRows(season: string, episodes: Episode[]): string {
       const dish = win && !win.forfeit ? ` (&ldquo;${esc(win.title)}&rdquo;)` : '';
       const out = ep.eliminated ? ` · ${ep.type === 'finale' ? 'Runner-up' : 'Went home'}: ${esc(chefName(ep.eliminated))}` : '';
       const theme = ep.theme ? `&ldquo;${esc(ep.theme)}&rdquo; · ` : '';
-      return `<li id="${esc(epAnchor(season, ep))}"><a href="${epPage(season, ep)}"><b>Ep ${ep.number} · ${TYPE_LABEL[ep.type]}</b><span>${theme}Winner: ${esc(chefName(ep.winner))}${dish}${out}</span></a></li>`;
+      return `<li id="${esc(epAnchor(season, ep))}"><a href="${epPage(season, ep)}"${evAttrs('episode_nav', { to: 'episode', from: 'earlier_row', season, episode: ep.number })}><b>Ep ${ep.number} · ${TYPE_LABEL[ep.type]}</b><span>${theme}Winner: ${esc(chefName(ep.winner))}${dish}${out}</span></a></li>`;
     })
     .join('')}</ol>`;
 }
@@ -296,7 +378,7 @@ ${eps.replace('<h2>', '<h3 class="pilot">').replace('</h2>', '</h3>')}`;
   const earlier = episodes.slice(0, -1);
   const body = latest
     ? `${episodeBlock(season, latest)}
-<p class="more"><a href="${epPage(season, latest)}">See the full episode page &rarr;</a></p>${earlier.length ? `\n<h2>Earlier episodes</h2>${episodeRows(season, earlier)}` : ''}`
+<p class="more"><a href="${epPage(season, latest)}"${evAttrs('episode_nav', { to: 'episode', from: 'home_latest', season, episode: latest.number })}>See the full episode page &rarr;</a></p>${earlier.length ? `\n<h2>Earlier episodes</h2>${episodeRows(season, earlier)}` : ''}`
     : `<p class="recap">${esc(seasonLabel(season))} starts Saturday.</p>`;
   return `${standings(season, state)}
 <div id="episodes">${body}</div>`;
@@ -314,7 +396,7 @@ function siteHeader(opts: { compact: boolean; root: string; status?: string; lat
 <h1>Model<span>Chef</span></h1>
 <p class="tag">A weekly cooking competition for language models. Every chef gets the same brief and one shot at a single-file web app. Three model judges score the dishes blind, the bottom two face a pressure test, and one chef goes home. Nothing is edited by a human.</p>
 <p class="status">${opts.status ?? ''}${opts.latestLink ?? ''}</p>
-<details class="panel" id="judges"><summary>Meet the judges</summary>
+<details class="panel" id="judges"${evAttrs('judges_open')}><summary>Meet the judges</summary>
 <ul class="judges">${JUDGES.map((j) => `<li>${monogram(j.id)}<b>${esc(j.name)}</b> <span class="lens">${j.lens === 'overall' ? 'the whole plate' : esc(j.lens)}</span><br>${esc(j.bio)}</li>`).join('')}</ul>
 <p>Each judge's own specialty counts double in their score.</p>
 </details>
@@ -323,14 +405,14 @@ function siteHeader(opts: { compact: boolean; root: string; status?: string; lat
 
 function siteFooter(repo: string | undefined, root = ''): string {
   return `<footer><p>Model output and scores are never edited. Recaps and labels are generated from the episode record by code.</p>
-<p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}">github.com/${esc(repo)}</a>.` : ''}</p>
-<p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p>${FEED ? `\n<p><a href="${root}feed.xml">Episode feed (Atom)</a></p>` : ''}</footer>`;
+<p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}"${evAttrs('outbound', { target: 'github' })}>github.com/${esc(repo)}</a>.` : ''}</p>
+<p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p>${FEED ? `\n<p><a href="${root}feed.xml"${evAttrs('outbound', { target: 'feed' })}>Episode feed (Atom)</a></p>` : ''}${GA_ID ? `\n<p><button type="button" class="linkish" data-consent-open>Cookie settings</button></p>` : ''}</footer>`;
 }
 
 /** The episode's own page, at s/<season>/ep-NN/index.html. */
 function episodePage(season: string, ep: Episode, prev: Episode | undefined, next: Episode | undefined, repo: string | undefined): string {
   const root = '../../../';
-  const nav = `<nav class="epnav" aria-label="Episodes"><a href="${root}index.html#episodes">&larr; All episodes</a>${prev ? `<a href="${epPage(season, prev, root)}">&larr; Episode ${prev.number}</a>` : ''}${next ? `<a class="next" href="${epPage(season, next, root)}">Episode ${next.number} &rarr;</a>` : ''}</nav>`;
+  const nav = `<nav class="epnav" aria-label="Episodes"><a href="${root}index.html#episodes"${evAttrs('episode_nav', { to: 'all', from: 'episode', episode: ep.number })}>&larr; All episodes</a>${prev ? `<a href="${epPage(season, prev, root)}"${evAttrs('episode_nav', { to: 'prev', from: 'episode', episode: ep.number })}>&larr; Episode ${prev.number}</a>` : ''}${next ? `<a class="next" href="${epPage(season, next, root)}"${evAttrs('episode_nav', { to: 'next', from: 'episode', episode: ep.number })}>Episode ${next.number} &rarr;</a>` : ''}</nav>`;
   const meta = share({ title: `${epTitle(ep)} · ModelChef`, description: recapText(season, ep), path: `/${epPath(season, ep)}/` }, `${epPath(season, ep)}/og.jpg`, 1200, 630);
   return page(
     `${epTitle(ep)} · ModelChef`,
@@ -428,6 +510,11 @@ function main() {
   SITE_URL = site.url;
   FEED = !!SITE_URL;
   console.log(`[modelchef] ${site.note}`);
+  const ga = (process.env.GA_MEASUREMENT_ID ?? '').trim();
+  GA_ID = /^G-[A-Z0-9]{4,}$/.test(ga) ? ga : '';
+  if (ga && !GA_ID) console.log(`[modelchef] warning: GA_MEASUREMENT_ID must look like G-XXXXXXX (got "${ga}"); building without Google Analytics`);
+  console.log(`[modelchef] google analytics: ${GA_ID ? `on (${GA_ID}, consent banner)` : 'off (GA_MEASUREMENT_ID unset)'}`);
+  GSC_TOKEN = (process.env.GOOGLE_SITE_VERIFICATION ?? '').trim();
   const feedItems: FeedItem[] = [];
 
   const repo = process.env.GITHUB_REPOSITORY;
@@ -488,6 +575,21 @@ ${siteFooter(repo)}`;
     writeFileSync(join(OUT, 'feed.xml'), atomFeed(SITE_URL, feedItems, new Date()));
     console.log(`[modelchef] feed: dist/feed.xml (${feedItems.length} episode${feedItems.length === 1 ? '' : 's'})`);
   } else console.log('[modelchef] feed: skipped (no SITE_URL)');
+
+  // Search engines: robots.txt always; sitemap.xml only with absolute URLs.
+  writeFileSync(join(OUT, 'robots.txt'), robotsTxt(SITE_URL));
+  if (SITE_URL) {
+    const newest = [...feedItems].sort((a, b) => b.ep.date.localeCompare(a.ep.date))[0]?.ep.date;
+    const urls: SitemapUrl[] = [{ path: '/', ...(newest ? { lastmod: newest } : {}) }];
+    for (const { season, ep } of feedItems) {
+      const base = `/${epPath(season, ep)}`;
+      urls.push({ path: `${base}/`, lastmod: ep.date });
+      for (const e of ep.entries) if (!e.forfeit) urls.push({ path: `${base}/play-${e.contestant}.html`, lastmod: ep.date });
+      for (const id of ep.pressure?.chefs ?? []) if (!ep.pressure!.forfeits[id]) urls.push({ path: `${base}/play-pressure-${id}.html`, lastmod: ep.date });
+    }
+    writeFileSync(join(OUT, 'sitemap.xml'), sitemapXml(SITE_URL, urls));
+    console.log(`[modelchef] sitemap: dist/sitemap.xml (${urls.length} URLs)`);
+  } else console.log('[modelchef] sitemap: skipped (no SITE_URL)');
   console.log(`[modelchef] built ${OUT}/ (${seasons.length} season${seasons.length === 1 ? '' : 's'})`);
 }
 
