@@ -5,7 +5,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, write
 import { join } from 'node:path';
 import { CONTESTANTS, DATA_DIR, JUDGES } from './config';
 import { challengeText, RULES } from './prompts';
-import { average, type Entry, type Episode, type SeasonState } from './state';
+import { average, SAME_FAMILY_REASON, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type SeasonState } from './state';
 
 const OUT = 'dist';
 const esc = (s: unknown) =>
@@ -29,6 +29,18 @@ function nameDishes(reason: string, order?: [string, string]): string {
   if (!order) return esc(reason);
   const name = (l: string) => chefName(l === 'A' ? order[0] : order[1]);
   return esc(reason.replace(/\bDish ([AB])\b/g, (_, l: string) => name(l)).replace(/\b([AB])(['’]s)\b/g, (_, l: string, s: string) => name(l) + s));
+}
+/** Records made before judge models were kept have no `model` on any score. */
+const keepsModels = (ep: Episode) => ep.entries.some((e) => e.judges.some((j) => j.model)) || !!ep.pressure?.votes.some((v) => v.model);
+const isSameFamily = (reason: string) => reason === SAME_FAMILY_REASON || /^(Abstained: )?same model family/i.test(reason);
+const prov = (text: string) => `<small class="prov">${text}</small>`;
+/** Which model stood behind a judge's score, vote or abstention. */
+function provenance(ep: Episode, x: JudgeScore | DuelVote | Abstention): string {
+  if ('reason' in x && isSameFamily(x.reason)) return '';
+  if (!keepsModels(ep)) return prov('model not recorded');
+  const scored = 'scores' in x || ('winner' in x && x.winner !== null);
+  if (x.model) return prov(scored ? `judged by ${esc(x.model)}` : `reply from ${esc(x.model)} could not be read`);
+  return prov('no model answered');
 }
 const TYPE_LABEL = { 'mystery-box': 'Mystery Box', invention: 'Invention Test', finale: 'Finale' } as const;
 
@@ -93,6 +105,7 @@ summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-of
 blockquote{margin:10px 0 0;padding-left:12px;border-left:3px solid var(--line)}
 blockquote b{display:block}
 blockquote small{color:var(--muted)}
+.prov{display:block;color:var(--muted);font-size:.78rem}
 .play{margin-top:auto;font-weight:700}
 .brief{margin:0 0 18px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
 .brief p{margin:10px 0 0}
@@ -170,9 +183,9 @@ function card(season: string, ep: Episode, e: Entry): string {
     ? `<details><summary>Judges' notes</summary>${e.judges
         .map(
           (j) =>
-            `<blockquote><b>${esc(j.judgeName)} · ${j.weighted.toFixed(1)}</b>${esc(j.critique)}<br><small>Use ${j.scores.usefulness} · Craft ${j.scores.craft} · Originality ${j.scores.originality} · Theme ${j.scores.theme}</small></blockquote>`,
+            `<blockquote><b>${esc(j.judgeName)} · ${j.weighted.toFixed(1)}</b>${esc(j.critique)}<br><small>Use ${j.scores.usefulness} · Craft ${j.scores.craft} · Originality ${j.scores.originality} · Theme ${j.scores.theme}</small>${provenance(ep, j)}</blockquote>`,
         )
-        .join('')}${e.abstained.map((a) => `<blockquote><b>${esc(judgeName(a.judge))} abstained</b><small>${esc(a.reason)}</small></blockquote>`).join('')}</details>`
+        .join('')}${e.abstained.map((a) => `<blockquote><b>${esc(a.judgeName ?? judgeName(a.judge))} abstained</b><small>${esc(a.reason)}</small>${provenance(ep, a)}</blockquote>`).join('')}</details>`
     : '';
 
   return `<article class="card">${shot}<div class="body">
@@ -198,7 +211,7 @@ function pressureBlock(season: string, ep: Episode): string {
     .map((id) => (p.forfeits[id] ? `${esc(chefName(id))} (no dish)` : `<a href="${base}/play-pressure-${id}.html">${esc(chefName(id))}</a>`))
     .join(' vs ');
   const votes = p.votes
-    .map((v) => `<li><b>${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${nameDishes(v.reason, v.order)}</li>`)
+    .map((v) => `<li><b>${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${nameDishes(v.reason, v.order)}${provenance(ep, v)}</li>`)
     .join('');
   return `<div class="pressure"><h3>Pressure test</h3>
 <p>${dishes}</p>
