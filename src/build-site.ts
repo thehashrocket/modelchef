@@ -3,8 +3,8 @@
 // CSP inside a sandboxed iframe: this site serves JavaScript nobody reviewed.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DATA_DIR, JUDGES } from './config';
-import { chefName, episodeBlock, esc, fmtScores, isPilot, pad, recapHtml, SCORE_EXPLAINED, seasonLabel } from './site-lib';
+import { CONTESTANTS, DATA_DIR, JUDGES, SEASON } from './config';
+import { chefName, episodeBlock, epAnchor, epPath, esc, fmtScores, isPilot, pad, recapHtml, SCORE_EXPLAINED, seasonLabel, TYPE_LABEL } from './site-lib';
 import { average, type Episode, type SeasonState } from './state';
 
 const OUT = 'dist';
@@ -98,6 +98,20 @@ h3{overflow-wrap:anywhere}
 footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
 footer p{margin:0 0 8px}
 .maker a{font-weight:600}
+header.compact{padding:28px 0 18px}
+header.compact h1{font-size:2rem}
+header.compact h1 a{color:inherit;text-decoration:none}
+.toplinks{display:flex;flex-wrap:wrap;gap:4px 18px;margin:10px 0 0}
+.toplinks a,.epnav a,.more a{display:inline-block;padding:10px 0;font-weight:600}
+.epnav{display:flex;flex-wrap:wrap;gap:0 18px;margin:12px 0 0}
+.epnav .next{margin-left:auto}
+.more{margin:14px 0 0}
+.earlier{list-style:none;margin:0;padding:0;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.earlier li{border-bottom:1px solid var(--line)}
+.earlier li:last-child{border-bottom:0}
+.earlier a{display:block;padding:12px 16px;text-decoration:none;color:var(--ink)}
+.earlier a:hover b{color:var(--accent)}
+.earlier span{display:block;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
 `;
 
 function page(title: string, body: string): string {
@@ -139,7 +153,11 @@ iframe{flex:1;border:0;width:100%;background:#fff}
 `;
 }
 
-function seasonSection(season: string, state: SeasonState, episodes: Episode[]): string {
+const TAGLINE = 'A weekly cooking competition for language models, where the dishes are single-file web apps and the judges are models too.';
+const epPage = (season: string, ep: Episode, root = '') => `${root}${epPath(season, ep)}/index.html`;
+const epTitle = (ep: Episode) => `Episode ${ep.number}: ${TYPE_LABEL[ep.type]}${ep.theme ? ` "${ep.theme}"` : ''}`;
+
+function standings(season: string, state: SeasonState): string {
   const left = Object.values(state.contestants).filter((c) => c.status === 'active').length;
   const ranked = Object.entries(state.contestants).map(([id, c]) => ({ id, c, avg: average(c.history), wins: c.history.filter((h) => h.outcome === 'won').length }));
   const fmt = fmtScores(ranked.filter((r) => r.c.history.length).map((r) => r.avg));
@@ -156,23 +174,86 @@ function seasonSection(season: string, state: SeasonState, episodes: Episode[]):
       return `<tr class="${c.status === 'eliminated' ? 'out' : ''}"><td>${esc(chefName(id))}</td><td class="status-cell">${status}</td><td class="num">${c.history.length ? fmt(avg) : '–'}</td><td class="num">${wins}</td><td class="num">${c.history.length}</td></tr>`;
     })
     .join('');
+  return `<h2>Standings, ${esc(seasonLabel(season))}</h2>
+<p class="sub">Season average of each chef's episode scores. ${esc(SCORE_EXPLAINED)}</p>
+<div class="scroll"><table><thead><tr><th>Chef</th><th>Status</th><th class="num">Average /10</th><th class="num">Wins</th><th class="num">Dishes</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 
-  const eps = [...episodes].reverse().map((ep) => episodeBlock(season, ep)).join('');
+/** One line per episode, newest first, each linking to its page. Keeps the old home-page anchors alive. */
+function episodeRows(season: string, episodes: Episode[]): string {
+  return `<ol class="earlier">${[...episodes]
+    .reverse()
+    .map((ep) => {
+      const win = ep.entries.find((e) => e.contestant === ep.winner);
+      const dish = win && !win.forfeit ? ` (&ldquo;${esc(win.title)}&rdquo;)` : '';
+      const out = ep.eliminated ? ` · ${ep.type === 'finale' ? 'Runner-up' : 'Went home'}: ${esc(chefName(ep.eliminated))}` : '';
+      const theme = ep.theme ? `&ldquo;${esc(ep.theme)}&rdquo; · ` : '';
+      return `<li id="${esc(epAnchor(season, ep))}"><a href="${epPage(season, ep)}"><b>Ep ${ep.number} · ${TYPE_LABEL[ep.type]}</b><span>${theme}Winner: ${esc(chefName(ep.winner))}${dish}${out}</span></a></li>`;
+    })
+    .join('')}</ol>`;
+}
 
+/**
+ * A season on the home page. The newest season shows its latest episode in
+ * full and the rest as rows; older seasons show standings and rows only.
+ */
+function seasonSection(season: string, state: SeasonState, episodes: Episode[], newest: boolean): string {
   // A pilot has no standings: its scores never counted toward anything.
   if (isPilot(season)) {
+    const eps = [...episodes].reverse().map((ep) => episodeBlock(season, ep)).join('');
     return `<h2>The pilot</h2>
 <p class="sub">A trial run before season 1, kept for the record. It did not count: no standings, no immunity, and the chef it sent home was back for the real season.</p>
 ${eps.replace('<h2>', '<h3 class="pilot">').replace('</h2>', '</h3>')}`;
   }
+  if (!newest) return `${standings(season, state)}${episodes.length ? `<h2>${esc(seasonLabel(season))} episodes</h2>${episodeRows(season, episodes)}` : ''}`;
 
-  return `<h2>Standings, ${esc(seasonLabel(season))}</h2>
-<p class="sub">Season average of each chef's episode scores. ${esc(SCORE_EXPLAINED)}</p>
-<div class="scroll"><table><thead><tr><th>Chef</th><th>Status</th><th class="num">Average /10</th><th class="num">Wins</th><th class="num">Dishes</th></tr></thead><tbody>${rows}</tbody></table></div>
-${eps}`;
+  const latest = episodes.at(-1);
+  const earlier = episodes.slice(0, -1);
+  const body = latest
+    ? `${episodeBlock(season, latest)}
+<p class="more"><a href="${epPage(season, latest)}">See the full episode page &rarr;</a></p>${earlier.length ? `\n<h2>Earlier episodes</h2>${episodeRows(season, earlier)}` : ''}`
+    : `<p class="recap">${esc(seasonLabel(season))} starts Saturday.</p>`;
+  return `${standings(season, state)}
+<div id="episodes">${body}</div>`;
 }
 
-function publishEpisode(season: string, ep: Episode) {
+function siteHeader(opts: { compact: boolean; root: string; status?: string; latestLink?: string }): string {
+  if (opts.compact) {
+    return `<header class="compact">
+<h1><a href="${opts.root}index.html">Model<span>Chef</span></a></h1>
+<p class="tag">${esc(TAGLINE)}</p>
+<p class="toplinks"><a href="${opts.root}index.html">About the show</a><a href="${opts.root}index.html#judges">Meet the judges &rarr;</a></p>
+</header>`;
+  }
+  return `<header>
+<h1>Model<span>Chef</span></h1>
+<p class="tag">A weekly cooking competition for language models. Every chef gets the same brief and one shot at a single-file web app. Three model judges score the dishes blind, the bottom two face a pressure test, and one chef goes home. Nothing is edited by a human.</p>
+<p class="status">${opts.status ?? ''}${opts.latestLink ?? ''}</p>
+<p class="panel" id="judges"><b>The panel:</b> ${JUDGES.map((j) => `${esc(j.name)} (${j.lens === 'overall' ? 'the whole plate' : esc(j.lens)})`).join(', ')}. Each judge's own specialty counts double in their score, and the machine check covers the house rules.</p>
+</header>`;
+}
+
+function siteFooter(repo: string | undefined): string {
+  return `<footer><p>Model output and scores are never edited. Recaps and labels are generated from the episode record by code.</p>
+<p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}">github.com/${esc(repo)}</a>.` : ''}</p>
+<p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p></footer>`;
+}
+
+/** The episode's own page, at s/<season>/ep-NN/index.html. */
+function episodePage(season: string, ep: Episode, prev: Episode | undefined, next: Episode | undefined, repo: string | undefined): string {
+  const root = '../../../';
+  const nav = `<nav class="epnav" aria-label="Episodes"><a href="${root}index.html#episodes">&larr; All episodes</a>${prev ? `<a href="${epPage(season, prev, root)}">&larr; Episode ${prev.number}</a>` : ''}${next ? `<a class="next" href="${epPage(season, next, root)}">Episode ${next.number} &rarr;</a>` : ''}</nav>`;
+  return page(
+    `${epTitle(ep)} · ModelChef`,
+    `${siteHeader({ compact: true, root })}
+${nav}
+${episodeBlock(season, ep, root)}
+${nav}
+${siteFooter(repo)}`,
+  );
+}
+
+function publishEpisode(season: string, ep: Episode, prev: Episode | undefined, next: Episode | undefined, repo: string | undefined) {
   const src = join(DATA_DIR, season, `ep-${pad(ep.number)}`);
   const out = join(OUT, 's', season, `ep-${pad(ep.number)}`);
   mkdirSync(join(out, 'apps'), { recursive: true });
@@ -189,6 +270,8 @@ function publishEpisode(season: string, ep: Episode) {
     writeFileSync(join(out, 'pressure', `${id}.html`), lockDown(readFileSync(join(src, 'pressure', `${id}.html`), 'utf8')));
     writeFileSync(join(out, `play-pressure-${id}.html`), playPage('Pressure test', chefName(id), `pressure/${id}.html`));
   }
+  // The pilot stays on the home page only.
+  if (!isPilot(season)) writeFileSync(join(out, 'index.html'), episodePage(season, ep, prev, next, repo));
 }
 
 function main() {
@@ -201,41 +284,54 @@ function main() {
         // Newest season first, the pilot always last.
         .sort((a, b) => Number(isPilot(a)) - Number(isPilot(b)) || b.localeCompare(a))
     : [];
+  // An explicit DATA_DIR with nothing in it is a mistake (usually build:mock before episode:mock).
+  if (!seasons.length && process.env.DATA_DIR) {
+    console.error(`DATA_DIR=${process.env.DATA_DIR} has no seasons. Run pnpm episode:mock first.`);
+    process.exit(1);
+  }
 
-  let status = 'The first episode has not aired yet.';
-  let latest = '';
-  let recap = '';
+  const repo = process.env.GITHUB_REPOSITORY;
+  let status = esc(`${seasonLabel(SEASON)} starts Saturday.`);
+  let latestLink = '';
   const sections: string[] = [];
   for (const [i, season] of seasons.entries()) {
     const state = JSON.parse(readFileSync(join(DATA_DIR, season, 'state.json'), 'utf8')) as SeasonState;
     const episodes = state.episodes.map(
       (e) => JSON.parse(readFileSync(join(DATA_DIR, season, `ep-${pad(e.number)}`, 'episode.json'), 'utf8')) as Episode,
     );
-    episodes.forEach((ep) => publishEpisode(season, ep));
-    sections.push(seasonSection(season, state, episodes));
-    if (i === 0 && !isPilot(season)) {
+    episodes.forEach((ep, j) => publishEpisode(season, ep, episodes[j - 1], episodes[j + 1], repo));
+    const newest = i === 0 && !isPilot(season);
+    sections.push(seasonSection(season, state, episodes, newest));
+    if (newest) {
       const left = Object.values(state.contestants).filter((c) => c.status === 'active').length;
+      const last = episodes.at(-1);
       status = state.champion
-        ? `${chefName(state.champion)} won ${seasonLabel(season)}.`
-        : `${seasonLabel(season)}, ${state.episodes.length} episode${state.episodes.length === 1 ? '' : 's'} in. ${left} chefs remain.`;
-      const last = state.episodes.at(-1);
-      if (last) latest = ` <a class="latest" href="#${esc(season)}-ep-${pad(last.number)}">Watch episode ${last.number} &darr;</a>`;
-      const lastEp = episodes.at(-1);
-      if (lastEp) recap = ` <span class="recap-line">${recapHtml(season, lastEp)}</span>`;
+        ? esc(`${seasonLabel(season)} champion: ${chefName(state.champion)}.`)
+        : last
+          ? esc(`${seasonLabel(season)}, ${episodes.length} episode${episodes.length === 1 ? '' : 's'} in. ${left} chefs remain.`)
+          : esc(`${seasonLabel(season)} starts Saturday.`);
+      if (last) {
+        status += ` <span class="recap-line">${recapHtml(season, last)}</span>`;
+        latestLink = ` <a class="latest" href="#${esc(epAnchor(season, last))}">Watch episode ${last.number} &darr;</a>`;
+      }
     }
   }
+  // Before the first episode: the roster, with nothing scored yet.
+  if (!sections.length) {
+    const empty: SeasonState = {
+      season: SEASON,
+      contestants: Object.fromEntries(CONTESTANTS.map((c) => [c.id, { status: 'active' as const, eliminatedIn: null, history: [] }])),
+      episodes: [],
+      immune: null,
+      nextTheme: null,
+      champion: null,
+    };
+    sections.push(seasonSection(SEASON, empty, [], true));
+  }
 
-  const repo = process.env.GITHUB_REPOSITORY;
-  const body = `<header>
-<h1>Model<span>Chef</span></h1>
-<p class="tag">A weekly cooking competition for language models. Every chef gets the same brief and one shot at a single-file web app. Three model judges score the dishes blind, the bottom two face a pressure test, and one chef goes home. Nothing is edited by a human.</p>
-<p class="status">${esc(status)}${recap}${latest}</p>
-<p class="panel"><b>The panel:</b> ${JUDGES.map((j) => `${esc(j.name)} (${j.lens === 'overall' ? 'the whole plate' : esc(j.lens)})`).join(', ')}. Each judge's own specialty counts double in their score, and the machine check covers the house rules.</p>
-</header>
+  const body = `${siteHeader({ compact: false, root: '', status, latestLink })}
 ${sections.join('')}
-<footer><p>Model output and scores are never edited. Recaps and labels are generated from the episode record by code.</p>
-<p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}">github.com/${esc(repo)}</a>.` : ''}</p>
-<p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p></footer>`;
+${siteFooter(repo)}`;
 
   writeFileSync(join(OUT, 'index.html'), page('ModelChef', body));
   writeFileSync(join(OUT, '.nojekyll'), '');
