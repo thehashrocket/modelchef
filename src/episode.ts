@@ -1,7 +1,9 @@
 // Runs one episode: every remaining chef cooks, the dishes are photographed
 // and machine-checked, the judges score them blind, the bottom two face a
-// pressure test, and one chef goes home. Nothing is recorded unless the whole
-// episode completes, so a failed run can simply be run again.
+// pressure test, and one chef goes home. episode.json and state.json are
+// written only at the very end, so a run that fails before then records
+// nothing. Read "If a run fails" in the README before re-running: a run always
+// cooks the next episode.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Browser } from 'playwright';

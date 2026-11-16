@@ -41,6 +41,31 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
 
+      # Before any git operation, keep a copy of what the episode wrote, so a
+      # failed commit or push can be restored by hand (README: "If a run fails").
+      # The copy is uploaded as an artifact only if a later step fails.
+      # Artifacts are downloadable: nothing secret may ever live under data/.
+      - name: Snapshot the results
+        run: |
+          mkdir -p "$RUNNER_TEMP/results"
+          cp -R data "$RUNNER_TEMP/results/data"
+          node -e '
+            const { execSync } = require("child_process");
+            const fs = require("fs");
+            const season = /SEASON = [\x22\x27]([^\x22\x27]+)/.exec(fs.readFileSync("src/config.ts", "utf8"))[1];
+            const state = JSON.parse(fs.readFileSync(`data/${season}/state.json`, "utf8"));
+            const files = execSync("git status --porcelain --untracked-files=all -- data", { encoding: "utf8" })
+              .split("\n").filter(Boolean).map((l) => l.slice(3));
+            const manifest = {
+              base: execSync("git rev-parse HEAD", { encoding: "utf8" }).trim(),
+              season,
+              episode: state.episodes.at(-1)?.number ?? null,
+              files,
+            };
+            fs.writeFileSync(process.env.RUNNER_TEMP + "/results/manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+            console.log(`snapshot: ${season} episode ${manifest.episode}, ${files.length} file(s) written`);
+          '
+
       # Pushing the results is what publishes them: Vercel rebuilds the site
       # from the repo on every push to the default branch.
       - name: Commit the results
@@ -53,3 +78,13 @@ jobs:
           # the results on top instead of failing the push.
           git pull --rebase
           git push
+
+      # Only when something failed after the episode wrote its results.
+      - name: Upload the results snapshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: episode-data-${{ github.run_id }}
+          path: ${{ runner.temp }}/results
+          retention-days: 14
+          if-no-files-found: warn

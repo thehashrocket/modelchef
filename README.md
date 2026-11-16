@@ -40,12 +40,19 @@ If an episode's commit does not deploy, check the deployment list in Vercel. The
 
 ### If a run fails
 
-GitHub emails you when the Episode workflow fails. **Do not just run it again**: a run always cooks the *next* episode (`episodes.length + 1` in `state.json`), so re-running after a run that did record its results airs an extra episode. Check first:
+GitHub emails you when the Episode workflow fails. **Do not just run it again**: a run always cooks the *next* episode (`episodes.length + 1` in `state.json`), so re-running after a run that did record its results airs an extra episode. First:
 
-1. **Is an Episode job still running?** Look at Actions → Episode. If one is running and already past the "Run the episode" step, wait for it: never cancel it while it is committing results. Otherwise wait for it to finish or cancel it.
-2. **Was the episode recorded?** On `main`, open `data/<season>/state.json` and check whether `episodes` has an entry for the episode that failed (and whether `data/<season>/ep-NN/` exists).
-3. **Not recorded:** the run failed before saving anything. Run Actions → Episode → Run workflow.
-4. **Recorded, but the commit, push or deploy failed:** fix that and push (or redeploy in Vercel). Do **not** re-run the workflow: that cooks the next episode.
+- **Is an Episode job still running?** Look at Actions → Episode. If one is past the "Run the episode" step, wait for it: never cancel it while it is committing results. Otherwise wait for it to finish or cancel it.
+
+Then find which step failed in the run log, and follow the matching case:
+
+1. **"Run the episode" failed.** The episode writes its results only at the very end, so nothing was recorded. Confirm on `main` that `data/<season>/state.json` has no entry for this episode, then run Actions → Episode → Run workflow.
+2. **"Commit the results" failed** (a commit or push error after the episode finished). The results exist only in the run's artifact, `episode-data-<run id>` (kept 14 days; Actions → the run → Artifacts). Do **not** re-run. Restore them:
+   1. Download and unzip the artifact. Its `manifest.json` lists the base commit, season, episode number and the files the run wrote.
+   2. In an up-to-date checkout of `main`: if `git log -1 --format=%H -- data` is the manifest's `base`, copy the artifact's `data/` over the checkout. If `main`'s data moved on since, copy only the new `data/<season>/ep-NN/`, and copy the artifact's `state.json` only if `git diff <base> -- data/<season>/state.json` is empty; otherwise stop and reconcile the two `state.json` files by hand.
+   3. Commit (`Episode results <date>`) and push. The push publishes the episode.
+3. **The commit is on `main` but the site didn't update.** The deploy failed: redeploy in Vercel. Do not re-run.
+4. **The artifact is missing, unreadable or incomplete** (no `manifest.json`, truncated JSON, missing screenshots or apps). Do not re-run until you know no episode was recorded: check `main`'s `state.json` and read the run log. Re-run only if it is clear nothing was recorded.
 
 ## Running locally
 
@@ -60,6 +67,40 @@ pnpm build
 Before a PR, run `pnpm verify`: unit tests (`pnpm test`), typecheck, and the site built from `data/` and from the fixtures in `test/fixtures/data/`. It needs no keys and no Chromium. CI runs it on every PR.
 
 The capture step needs Chromium: `pnpm exec playwright install chromium`, or set `CHROME_PATH` to a Chrome you already have. `MOCK_FORFEIT=<chef id>` makes one mock chef serve nothing. Each episode also renders a share image, `og.jpg`; if that fails the episode still records, and `pnpm backfill-share-images <season>/ep-NN` renders it afterwards (`--help` for options). `SHARE_IMAGE=0` skips it.
+
+## Rehearsing a twist
+
+A rehearsal runs a real episode against the live models in `.rehearsal/`, without touching the season. **Never rehearse on a Saturday (UTC) before that day's episode results are committed.** If a run stops partway, its state is unknown: `rm -rf .rehearsal` and copy again before retrying.
+
+**Secret ingredient (episode 3).** Run after S1E2 has aired:
+
+```sh
+rm -rf .rehearsal && mkdir -p .rehearsal && cp -r data/season-01 .rehearsal/season-01
+node -e "const s=require('./.rehearsal/season-01/state.json'); const a=Object.values(s.contestants).filter(c=>c.status==='active').length; if (s.episodes.length!==2||a<3) { console.error('expected 2 episodes and 3+ active chefs, got', s.episodes.length, a); process.exit(1) } console.log('next run: episode 3, a Mystery Box with a secret ingredient')"
+DATA_DIR=.rehearsal pnpm episode
+DATA_DIR=.rehearsal pnpm build   # then open dist/ and check the cards
+```
+
+Check that the run log names the ingredient, every dish's machine-check line states the ingredient result, and the judges' notes mention it.
+
+**Guest judge (finale).** The guest is paid (OpenRouter credit): the brief plus two dishes. Check the balance first, as its own step:
+
+```sh
+set -a; . ./.env; set +a
+curl -s -H "Authorization: Bearer $OPENROUTER_API_KEY" https://openrouter.ai/api/v1/key      # data.limit_remaining
+curl -s -H "Authorization: Bearer $OPENROUTER_API_KEY" https://openrouter.ai/api/v1/credits  # total_credits - total_usage
+```
+
+Then cut the season to its two best chefs and run the finale:
+
+```sh
+rm -rf .rehearsal && mkdir -p .rehearsal && cp -r data/season-01 .rehearsal/season-01
+node -e "const fs=require('fs'), f='./.rehearsal/season-01/state.json', s=require(f); const avg=c=>c.history.reduce((t,h)=>t+h.total,0)/Math.max(1,c.history.length); const ids=Object.keys(s.contestants).filter(id=>s.contestants[id].status==='active').sort((a,b)=>avg(s.contestants[b])-avg(s.contestants[a])); const last=s.episodes.at(-1).number; ids.slice(2).forEach(id=>{s.contestants[id].status='eliminated'; s.contestants[id].eliminatedIn=last}); s.immune=null; if (Object.values(s.contestants).filter(c=>c.status==='active').length!==2) { console.error('expected exactly 2 active chefs'); process.exit(1) } fs.writeFileSync(f, JSON.stringify(s,null,2)+'\n'); console.log('finalists:', ids.slice(0,2).join(', '))"
+DATA_DIR=.rehearsal pnpm episode
+DATA_DIR=.rehearsal pnpm build
+```
+
+Check that the guest set the brief and scored both finalists. Make at most two paid finale attempts; if it still fails, fix it or set `GUEST_JUDGE = null` in `src/config.ts` before the finale airs.
 
 ## Tuning
 
