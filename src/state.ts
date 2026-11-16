@@ -63,6 +63,8 @@ export interface DuelVote {
   judgeName: string;
   winner: string | null;
   reason: string;
+  /** Chef ids in the order this judge saw them: [Dish A, Dish B]. */
+  order?: [string, string];
 }
 
 export interface PressureTest {

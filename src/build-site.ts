@@ -20,6 +20,16 @@ const seasonLabel = (season: string) => {
   const m = /^season-0*(\d+)$/.exec(season);
   return m ? `Season ${m[1]}` : season;
 };
+const fmtDate = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+};
+/** Judges see the pressure-test pair as "Dish A" and "Dish B"; readers should see who they mean. */
+function nameDishes(reason: string, order?: [string, string]): string {
+  if (!order) return esc(reason);
+  const name = (l: string) => chefName(l === 'A' ? order[0] : order[1]);
+  return esc(reason.replace(/\bDish ([AB])\b/g, (_, l: string) => name(l)).replace(/\b([AB])(['’]s)\b/g, (_, l: string, s: string) => name(l) + s));
+}
 const TYPE_LABEL = { 'mystery-box': 'Mystery Box', invention: 'Invention Test', finale: 'Finale' } as const;
 
 const CSP =
@@ -55,6 +65,7 @@ tr:last-child td{border-bottom:0}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 tr.out td{color:var(--muted)}
 .scroll{overflow-x:auto}
+@media (max-width:560px){th,td{padding:9px 10px}th:nth-child(n+4),td:nth-child(n+4){display:none}td:first-child{min-width:9.5em}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
 .card img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;border-bottom:1px solid var(--line);background:var(--line)}
@@ -64,15 +75,21 @@ tr.out td{color:var(--muted)}
 .score{font:700 1.5rem/1 Georgia,serif;font-variant-numeric:tabular-nums}
 .by{color:var(--muted);font-size:.9rem}
 .pitch{margin:0}
-.says{margin:0;font-size:.92rem;color:var(--muted);font-style:italic}
-.says b{font-style:normal}
+.says p{margin:8px 0 0;color:var(--muted);font-style:italic}
+.jrow{display:flex;flex-wrap:wrap;gap:6px;font-size:.8rem;font-variant-numeric:tabular-nums}
+.jrow span{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted)}
+.jrow b{color:var(--ink);font-weight:600}
+.panel{color:var(--muted);font-size:.92rem;margin:10px 0 0;max-width:72ch}
+.panel b{color:var(--ink)}
+.latest{font-weight:600}
 .badges{display:flex;flex-wrap:wrap;gap:6px}
 .badge{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
 .badge.win{color:var(--good);border-color:currentColor}
 .badge.gone{color:var(--bad);border-color:currentColor}
 .mech{font-size:.82rem;color:var(--muted)}
 details{font-size:.92rem}
-summary{cursor:pointer;color:var(--accent);font-weight:600}
+summary{cursor:pointer;color:var(--accent);font-weight:600;padding:2px 0}
+summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
 blockquote{margin:10px 0 0;padding-left:12px;border-left:3px solid var(--line)}
 blockquote b{display:block}
 blockquote small{color:var(--muted)}
@@ -84,6 +101,8 @@ blockquote small{color:var(--muted)}
 .pressure p{margin:6px 0}
 .pressure ul{margin:8px 0 0;padding-left:20px}
 footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
+footer p{margin:0 0 8px}
+.maker a{font-weight:600}
 `;
 
 function page(title: string, body: string): string {
@@ -143,6 +162,10 @@ function card(season: string, ep: Episode, e: Entry): string {
     ? `<div class="mech">Machine check ${m.score}/10 · ${(m.bytes / 1024).toFixed(0)} KB · ${m.consoleErrors.length} console error${m.consoleErrors.length === 1 ? '' : 's'} · ${m.networkAttempts.length} network attempt${m.networkAttempts.length === 1 ? '' : 's'}${m.mobileOverflow ? ' · overflows on phone' : ''}${m.ingredient === 'missing' ? ' · secret ingredient missing' : ''}</div>`
     : '';
 
+  const short = (name: string) => name.replace(/^The /, '');
+  const jrow = e.judges.length
+    ? `<div class="jrow" aria-label="Judge scores">${e.judges.map((j) => `<span>${esc(short(j.judgeName))} <b>${j.weighted.toFixed(1)}</b></span>`).join('')}</div>`
+    : '';
   const notes = e.judges.length
     ? `<details><summary>Judges' notes</summary>${e.judges
         .map(
@@ -157,8 +180,8 @@ function card(season: string, ep: Episode, e: Entry): string {
 <div class="by">${esc(chefName(e.contestant))}</div>
 <div class="badges">${badges.join('')}</div>
 ${e.forfeit ? '' : `<p class="pitch">${esc(e.pitch)}</p>`}
-${e.presentation ? `<p class="says"><b>The chef says:</b> ${esc(e.presentation)}</p>` : ''}
-${mech}${notes}
+${e.presentation ? `<details class="says"><summary>What the chef told the judges</summary><p>${esc(e.presentation)}</p></details>` : ''}
+${jrow}${mech}${notes}
 ${e.forfeit ? '' : `<a class="play" href="${base}/play-${e.contestant}.html">Open the dish &rarr;</a>`}
 </div></article>`;
 }
@@ -175,7 +198,7 @@ function pressureBlock(season: string, ep: Episode): string {
     .map((id) => (p.forfeits[id] ? `${esc(chefName(id))} (no dish)` : `<a href="${base}/play-pressure-${id}.html">${esc(chefName(id))}</a>`))
     .join(' vs ');
   const votes = p.votes
-    .map((v) => `<li><b>${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${esc(v.reason)}</li>`)
+    .map((v) => `<li><b>${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${nameDishes(v.reason, v.order)}</li>`)
     .join('');
   return `<div class="pressure"><h3>Pressure test</h3>
 <p>${dishes}</p>
@@ -222,8 +245,8 @@ function seasonSection(season: string, state: SeasonState, episodes: Episode[]):
             : '';
       const twist = ep.ingredient ? `<p class="sub"><b>Secret ingredient:</b> ${esc(ep.ingredient.text)}</p>` : '';
       const title = isPilot(season) ? 'Pilot' : `Episode ${ep.number}`;
-      return `<h2>${title}: ${TYPE_LABEL[ep.type]}${theme}</h2>
-<p class="sub">${esc(ep.date)}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}
+      return `<h2 id="${esc(season)}-ep-${pad(ep.number)}">${title}: ${TYPE_LABEL[ep.type]}${theme}</h2>
+<p class="sub">${esc(fmtDate(ep.date))}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}
 ${briefBlock(ep)}
 <div class="grid">${ep.entries.map((e) => card(season, ep, e)).join('')}</div>
 ${pressureBlock(season, ep)}`;
@@ -274,6 +297,7 @@ function main() {
     : [];
 
   let status = 'The first episode has not aired yet.';
+  let latest = '';
   const sections: string[] = [];
   for (const [i, season] of seasons.entries()) {
     const state = JSON.parse(readFileSync(join(DATA_DIR, season, 'state.json'), 'utf8')) as SeasonState;
@@ -287,6 +311,8 @@ function main() {
       status = state.champion
         ? `${chefName(state.champion)} won ${seasonLabel(season)}.`
         : `${seasonLabel(season)}, ${state.episodes.length} episode${state.episodes.length === 1 ? '' : 's'} in. ${left} chefs remain.`;
+      const last = state.episodes.at(-1);
+      if (last) latest = ` <a class="latest" href="#${esc(season)}-ep-${pad(last.number)}">Watch episode ${last.number} &darr;</a>`;
     }
   }
 
@@ -294,10 +320,12 @@ function main() {
   const body = `<header>
 <h1>Model<span>Chef</span></h1>
 <p class="tag">A weekly cooking competition for language models. Every chef gets the same brief and one shot at a single-file web app. Three model judges score the dishes blind, the bottom two face a pressure test, and one chef goes home. Nothing is edited by a human.</p>
-<p class="status">${esc(status)}</p>
+<p class="status">${esc(status)}${latest}</p>
+<p class="panel"><b>The panel:</b> ${JUDGES.map((j) => `${esc(j.name)} (${j.lens === 'overall' ? 'the whole plate' : esc(j.lens)})`).join(', ')}. Each judge's own specialty counts double in their score, and the machine check covers the house rules.</p>
 </header>
 ${sections.join('')}
-<footer>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}">github.com/${esc(repo)}</a>.` : ''}</footer>`;
+<footer><p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}">github.com/${esc(repo)}</a>.` : ''}</p>
+<p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p></footer>`;
 
   writeFileSync(join(OUT, 'index.html'), page('ModelChef', body));
   writeFileSync(join(OUT, '.nojekyll'), '');

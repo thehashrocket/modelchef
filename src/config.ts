@@ -138,7 +138,7 @@ export const JUDGES: Judge[] = [
     family: 'nvidia',
     lens: 'originality',
     persona:
-      'You have seen ten thousand to-do lists and pomodoro timers and you are tired. You reward ideas you have not seen before and penalise anything that chases last week\'s winner. A flawed surprise beats a polished cliche.',
+      'In your career you have seen ten thousand to-do lists and pomodoro timers and you are tired of them. You reward ideas you have not seen before and penalise anything that chases last week\'s winner. A flawed surprise beats a polished cliche.',
     vision: true,
     sourceChars: 30000,
     // A judge may fall back to a sibling model: the seat matters, not the exact weights.

@@ -155,8 +155,39 @@ export interface Dish {
 const clip = (source: string, max: number) =>
   source.length > max ? `${source.slice(0, max)}\n<!-- source truncated for the judge: ${source.length - max} more characters -->` : source;
 
-export function judgePrompt(judge: Judge, challenge: Challenge, dish: Dish): Msg[] {
+/** Where the show is when a judge tastes a dish. Judges remember only what is listed here. */
+export interface ShowContext {
+  season: string;
+  episode: number;
+  /** Dishes that won earlier episodes this season, oldest first. */
+  earlierWinners: { episode: number; title: string; pitch: string }[];
+  /** How many dishes this panel has judged on the show before this episode. */
+  dishesJudged: number;
+}
+
+/** Keeps the judges in the right place in the season, so episode 1 never sounds like episode 9. */
+export function showText(show: ShowContext): string {
+  const where =
+    show.episode === 1
+      ? `This is episode 1 of ${show.season}: the first episode. You have not judged a single dish on this show before today. Do not mention earlier episodes, "this season", or dishes you have judged here, because there are none. Your experience comes from your career before the show, so talk about that if you need a comparison.`
+      : `This is episode ${show.episode} of ${show.season}. Before today you have judged ${show.dishesJudged} dish${show.dishesJudged === 1 ? '' : 'es'} on this show.`;
+  const winners = show.earlierWinners.length
+    ? `
+Earlier winners this season:
+${show.earlierWinners.map((w) => `- Episode ${w.episode}: "${w.title}" (${w.pitch})`).join('\n')}`
+    : '';
+  const rule =
+    show.episode === 1
+      ? ''
+      : '\nWhen you compare a dish to the show, compare it only to what is listed here. Do not invent dishes, episodes or numbers you have not seen.';
+  return `WHERE WE ARE IN THE SHOW
+${where}${winners}${rule}`;
+}
+
+export function judgePrompt(judge: Judge, challenge: Challenge, dish: Dish, show: ShowContext): Msg[] {
   const text = `You are judging one dish in a ModelChef episode. You do not know which chef made it, and you should not guess.
+
+${showText(show)}
 
 THE CHALLENGE
 ${challengeText(challenge)}
@@ -193,10 +224,12 @@ Reply with JSON only, in exactly this shape:
   ];
 }
 
-export function duelPrompt(judge: Judge, spec: string, a: Dish, b: Dish): Msg[] {
+export function duelPrompt(judge: Judge, spec: string, a: Dish, b: Dish, show: ShowContext): Msg[] {
   const half = Math.floor(judge.sourceChars / 2);
   const side = (name: string, d: Dish) => `DISH ${name}\nMachine report:\n${mechText(d.mech)}\n\nSource:\n${clip(d.source, half)}`;
   const text = `PRESSURE TEST. Two chefs built the same dish from the same spec. Pick the better one. The other chef goes home.
+
+${showText(show)}
 
 THE SPEC
 ${spec}

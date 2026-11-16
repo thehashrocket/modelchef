@@ -20,7 +20,7 @@ import {
   type SecretIngredient,
 } from './config';
 import { chat, extractHtml, parseJson } from './llm';
-import { challengeText, cookPrompt, duelPrompt, guestBriefPrompt, judgePrompt, pressurePrompt, themePrompt, type Challenge, type Dish } from './prompts';
+import { challengeText, cookPrompt, duelPrompt, guestBriefPrompt, judgePrompt, pressurePrompt, themePrompt, type Challenge, type Dish, type ShowContext } from './prompts';
 import {
   episodeDir,
   loadState,
@@ -34,6 +34,7 @@ import {
   type Outcome,
   type PressureTest,
   type Scores,
+  type SeasonState,
 } from './state';
 import type { Msg } from './llm';
 
@@ -106,7 +107,7 @@ async function cook(chef: Contestant, messages: Msg[], path: string): Promise<Co
 
 const clamp = (v: unknown) => Math.min(10, Math.max(1, Math.round(Number(v)) || 1));
 
-async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefFamily: string) {
+async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefFamily: string, show: ShowContext) {
   const judges: JudgeScore[] = [];
   const abstained: Entry['abstained'] = [];
   for (const judge of panel) {
@@ -118,7 +119,7 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefF
     let failure = '';
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const { text } = await chat(judge.models, judgePrompt(judge, challenge, dish), { maxTokens: 8000, temperature: 0.4, kind: 'judge' });
+        const { text } = await chat(judge.models, judgePrompt(judge, challenge, dish, show), { maxTokens: 8000, temperature: 0.4, kind: 'judge' });
         const reply = parseJson<{ scores?: Partial<Scores>; critique?: string; improve?: string }>(text);
         if (!reply.scores) throw new Error('reply has no scores');
         const scores: Scores = {
@@ -154,6 +155,7 @@ async function pressureTest(
   dir: string,
   /** Higher-ranked chef first. */
   chefs: [Contestant, Contestant],
+  show: ShowContext,
 ): Promise<PressureTest> {
   const spec = pick(PRESSURE_SPECS);
   const [upper, lower] = chefs;
@@ -185,8 +187,10 @@ async function pressureTest(
     }
     // Each judge sees the pair in a random order so position cannot decide it.
     const [a, b] = shuffle([upper, lower]) as [Contestant, Contestant];
+    // Kept so the site can say which chef "Dish A" and "Dish B" were in this judge's reason.
+    vote.order = [a.id, b.id];
     try {
-      const { text } = await chat(judge.models, duelPrompt(judge, spec, dishes.get(a.id)!, dishes.get(b.id)!), { maxTokens: 8000, temperature: 0.3, kind: 'duel' });
+      const { text } = await chat(judge.models, duelPrompt(judge, spec, dishes.get(a.id)!, dishes.get(b.id)!, show), { maxTokens: 8000, temperature: 0.3, kind: 'duel' });
       const reply = parseJson<{ winner?: string; reason?: string }>(text);
       const letter = String(reply.winner ?? '').trim().toUpperCase();
       if (letter !== 'A' && letter !== 'B') throw new Error('no clear winner in reply');
@@ -202,6 +206,19 @@ async function pressureTest(
   const low = tally.get(lower.id)!;
   if (up === low) return result; // tie or no votes: the main round decides
   return { ...result, eliminated: up > low ? lower.id : upper.id, decidedBy: 'votes' };
+}
+
+/** What the judges know about the season so far: only what actually happened on the show. */
+function showContext(state: SeasonState, n: number): ShowContext {
+  const histories = Object.values(state.contestants).flatMap((c) => c.history);
+  const earlierWinners = state.episodes
+    .map((ep) => {
+      const h = state.contestants[ep.winner]?.history.find((x) => x.episode === ep.number);
+      return h ? { episode: ep.number, title: h.title, pitch: h.pitch } : null;
+    })
+    .filter((w): w is ShowContext['earlierWinners'][number] => !!w);
+  const m = /^season-0*(\d+)$/.exec(String(state.season));
+  return { season: m ? `season ${m[1]}` : String(state.season), episode: n, earlierWinners, dishesJudged: histories.length };
 }
 
 async function main() {
@@ -249,6 +266,7 @@ async function main() {
     else panel = [...JUDGES, guest];
   }
   const challenge: Challenge = { type, theme, ingredient: ingredient?.text ?? null, guest: guest?.name ?? null };
+  const show = showContext(state, n);
 
   const dir = episodeDir(n);
   for (const sub of ['apps', 'shots', 'pressure']) mkdirSync(join(dir, sub), { recursive: true });
@@ -290,7 +308,7 @@ async function main() {
       const { mech, shots } = await capture(browser, path, join(dir, 'shots', chef.id), { ...cooked, ingredient });
       entry.mech = mech;
       const dish: Dish = { label: entry.label, title: entry.title, pitch: entry.pitch, presentation: entry.presentation, mech, source: readFileSync(path, 'utf8'), shots };
-      Object.assign(entry, await judgeDish(panel, challenge, dish, chef.family));
+      Object.assign(entry, await judgeDish(panel, challenge, dish, chef.family, show));
       if (!entry.judges.length) {
         throw new Error(`No judge could score ${chef.id} (${entry.abstained.map((a) => a.reason).join('; ')}). Episode not recorded.`);
       }
@@ -309,7 +327,7 @@ async function main() {
       const atRisk = entries.filter((e, i) => i > 0 && e.contestant !== immune).slice(-2);
       const chefs = atRisk.map((e) => active.find((c) => c.id === e.contestant)!) as [Contestant, Contestant];
       log(`  Pressure test: ${chefs[0].id} vs ${chefs[1].id}`);
-      pressure = await pressureTest(browser, dir, chefs);
+      pressure = await pressureTest(browser, dir, chefs, show);
     }
   } finally {
     await browser.close();

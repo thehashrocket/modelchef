@@ -406,19 +406,31 @@
         "judge": "pragmatist",
         "judgeName": "The Pragmatist",
         "winner": "gpt-oss",
-        "reason": "Dish A correctly renders lists by grouping items into a single unordered list and includes secure link attributes, whereas Dish B's list parsing is broken, generating multiple invalid list containers."
+        "reason": "Dish A correctly renders lists by grouping items into a single unordered list and includes secure link attributes, whereas Dish B's list parsing is broken, generating multiple invalid list containers.",
+        "order": [
+          "gpt-oss",
+          "cohere-north"
+        ]
       },
       {
         "judge": "craftsman",
         "judgeName": "The Craftsman",
         "winner": "gpt-oss",
-        "reason": "Cleaner full-height split with restrained chrome, proper list handling, safer external links, and a tighter unobtrusive word count; A’s boxy panes, broken nested lists, and extra title waste space."
+        "reason": "Cleaner full-height split with restrained chrome, proper list handling, safer external links, and a tighter unobtrusive word count; A’s boxy panes, broken nested lists, and extra title waste space.",
+        "order": [
+          "cohere-north",
+          "gpt-oss"
+        ]
       },
       {
         "judge": "maverick",
         "judgeName": "The Maverick",
         "winner": "gpt-oss",
-        "reason": "Dish B renders nested lists correctly while Dish A wraps every list item in its own <ul>, breaking list hierarchy; both meet the spec, but B's smaller, cleaner implementation avoids A's structural bug."
+        "reason": "Dish B renders nested lists correctly while Dish A wraps every list item in its own <ul>, breaking list hierarchy; both meet the spec, but B's smaller, cleaner implementation avoids A's structural bug.",
+        "order": [
+          "cohere-north",
+          "gpt-oss"
+        ]
       }
     ],
     "eliminated": "cohere-north",
