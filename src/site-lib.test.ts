@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { abstentionKind, card, dishChrome, featuredCard, fmtScores, judgeChips, judgeClass, judgeCss, panelJudges, unknownJudgeIds, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
+import { abstentionKind, atomFeed, card, nextEpisodeLine, nextSaturday, dishChrome, featuredCard, fmtScores, judgeChips, judgeClass, judgeCss, panelJudges, unknownJudgeIds, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
 import { GUEST_UNEVEN_REASON, SAME_FAMILY_REASON, type DuelVote, type Entry, type Episode, type PressureTest } from './state';
 
 const entry = (contestant: string, total: number, over: Partial<Entry> = {}): Entry => ({
@@ -321,5 +321,61 @@ describe('judge identity', () => {
   });
   it('sanitises ids into class names', () => {
     assert.equal(judgeClass('The "Odd" Judge!'), 'j-theoddjudge');
+  });
+});
+
+describe('nextSaturday', () => {
+  it('a Saturday goes to the following Saturday', () => assert.equal(nextSaturday('2026-11-14'), '2026-11-21'));
+  it('a Sunday', () => assert.equal(nextSaturday('2026-11-15'), '2026-11-21'));
+  it('a Friday', () => assert.equal(nextSaturday('2026-11-20'), '2026-11-21'));
+  it('month rollover', () => assert.equal(nextSaturday('2026-11-28'), '2026-12-05'));
+  it('year rollover', () => assert.equal(nextSaturday('2026-12-26'), '2027-01-02'));
+});
+
+describe('nextEpisodeLine', () => {
+  it('names the next Saturday', () => assert.equal(nextEpisodeLine('2026-11-14', false, '2026-11-15'), 'Episodes air Saturdays; next expected November 21.'));
+  it('is shown on the day itself', () => assert.match(nextEpisodeLine('2026-11-14', false, '2026-11-21'), /November 21/));
+  it('hides once that date has passed', () => assert.equal(nextEpisodeLine('2026-11-14', false, '2026-11-22'), ''));
+  it('hides after a finale and before any episode', () => {
+    assert.equal(nextEpisodeLine('2026-11-14', true, '2026-11-15'), '');
+    assert.equal(nextEpisodeLine(undefined, false, '2026-11-15'), '');
+  });
+});
+
+describe('atomFeed', () => {
+  const now = new Date('2026-11-15T10:00:00.123Z');
+  const required = (xml: string) => {
+    for (const re of [/^<\?xml version="1\.0" encoding="utf-8"\?>/, /<feed xmlns="http:\/\/www\.w3\.org\/2005\/Atom">/, /<title>ModelChef<\/title>/, /<id>https:\/\/e\.test\/<\/id>/, /<link rel="self" href="https:\/\/e\.test\/feed\.xml"\/>/, /<updated>\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ<\/updated>/, /<author><name>ModelChef<\/name><\/author>/, /<\/feed>\s*$/])
+      assert.match(xml, re);
+  };
+  it('is a valid empty feed with no episodes', () => {
+    const xml = atomFeed('https://e.test', [], now);
+    required(xml);
+    assert.ok(!xml.includes('<entry>'));
+    assert.match(xml, /<updated>2026-11-15T10:00:00Z<\/updated>/);
+  });
+  it('one entry per episode, absolute links, recap as summary', () => {
+    const ep = episode({ votes: [vote('gpt-oss')] });
+    const xml = atomFeed('https://e.test', [{ season: 'season-01', ep }], now);
+    required(xml);
+    assert.match(xml, /<title>Episode 1: Mystery Box &quot;Something for a kitchen&quot;<\/title>/);
+    assert.match(xml, /<link href="https:\/\/e\.test\/s\/season-01\/ep-01\/"\/>\s*<id>https:\/\/e\.test\/s\/season-01\/ep-01\/<\/id>\s*<updated>2026-11-14T17:23:00Z<\/updated>/);
+    assert.match(xml, /<summary>Gemini 3\.8 Flash won with &quot;gemini-flash dish&quot;/);
+  });
+  it('strips XML-illegal characters and escapes markup', () => {
+    const ep = episode(null, { theme: `bell\u0007 "><script>x</script>'&` });
+    const xml = atomFeed('https://e.test', [{ season: 'season-01', ep }], now);
+    assert.ok(!xml.includes('\u0007'));
+    assert.ok(!xml.includes('<script'));
+    assert.match(xml, /bell &quot;&gt;&lt;script&gt;x&lt;\/script&gt;&apos;&amp;/);
+  });
+  it('two seasons with finales: newest first, season-labelled titles', () => {
+    const f1 = episode(null, { type: 'finale', number: 5, date: '2026-12-12', eliminated: 'gpt-oss', theme: null });
+    const f2 = episode(null, { type: 'finale', number: 5, date: '2027-03-06', eliminated: 'gpt-oss', theme: null });
+    const xml = atomFeed('https://e.test', [{ season: 'season-01', ep: f1 }, { season: 'season-02', ep: f2 }], now);
+    const titles = [...xml.matchAll(/<entry>\s*<title>([^<]*)<\/title>/g)].map((m) => m[1]);
+    assert.deepEqual(titles, ['Season 2, Episode 5: Finale', 'Season 1, Episode 5: Finale']);
+    assert.match(xml, /<feed[^>]*>[\s\S]*?<updated>2027-03-06T17:23:00Z<\/updated>/);
+    assert.match(xml, /is the Season 2 champion/);
   });
 });

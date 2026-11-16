@@ -3,9 +3,9 @@
 // CLI in check-links.ts supplies a file system.
 import { posix } from 'node:path';
 
-/** The site's own pages. Never dishes under apps/ or pressure/: those are model output. */
+/** The site's own pages (and its feed). Never dishes under apps/ or pressure/: those are model output. */
 export function isSitePage(rel: string): boolean {
-  return rel === 'index.html' || /^s\/[^/]+\/ep-[^/]+\/(index|play-[^/]+)\.html$/.test(rel);
+  return rel === 'index.html' || rel === 'feed.xml' || /^s\/[^/]+\/ep-[^/]+\/(index|play-[^/]+)\.html$/.test(rel);
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
