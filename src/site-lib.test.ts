@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { card, featuredCard, recapText, tieTitle } from './site-lib';
+import { card, featuredCard, mechLine, mechProblems, recapText, tieTitle } from './site-lib';
 import type { DuelVote, Entry, Episode, PressureTest } from './state';
 
 const entry = (contestant: string, total: number, over: Partial<Entry> = {}): Entry => ({
@@ -147,4 +147,41 @@ describe('escaping', () => {
       assert.ok(html.includes('&quot;&gt;&lt;script&gt;x&lt;/script&gt;&#39;&amp;'), 'escaped form present');
     });
   }
+});
+
+describe('mechLine', () => {
+  const ok = (): NonNullable<Entry['mech']> => ({ bytes: 60_000, consoleErrors: [], networkAttempts: [], mobileOverflow: false, blank: false, hasTitle: true, hasDescription: true, score: 10 });
+  const ep = (over: Partial<Episode> = {}) => episode(null, over);
+
+  it('collapses to "passed" with the detail for screen readers', () => {
+    const html = mechLine(ok(), ep());
+    assert.match(html, /class="mech ok"/);
+    assert.match(html, /✓<\/span> Machine check passed<\/span>/);
+    assert.match(html, /<span class="sr">Machine check passed, 10\/10 · 59 KB · no console errors · no network attempts<\/span>/);
+  });
+
+  it('lists every problem in order, counts only', () => {
+    const m = { ...ok(), score: 1, blank: true, networkAttempts: ['https://x'], consoleErrors: ['<b>boom</b>', 'two'], mobileOverflow: true, ingredient: 'missing' as const, hasTitle: false };
+    assert.deepEqual(mechProblems(m), ['Rendered blank', '1 network attempt', '2 console errors', 'Overflows on phone', 'Secret ingredient missing', 'Missing title or description']);
+    const html = mechLine(m, ep());
+    assert.match(html, /⚠<\/span> Machine check <b>1\/10<\/b>: <span class="problems">Rendered blank · 1 network attempt/);
+    assert.ok(!html.includes('boom'), 'console text never shown');
+  });
+
+  it('a single problem', () => {
+    assert.match(mechLine({ ...ok(), score: 9, consoleErrors: ['x'] }, ep()), /9\/10<\/b>: <span class="problems">1 console error<\/span>/);
+  });
+
+  it('always shows the size when size is the secret ingredient', () => {
+    const tiny = ep({ ingredient: { id: 'tiny', text: 'Tiny kitchen.' } });
+    assert.match(mechLine({ ...ok(), bytes: 8090, ingredient: 'present' }, tiny), /Machine check passed · 7\.9 KB · secret ingredient check passed/);
+    assert.match(mechLine({ ...ok(), bytes: 9000, score: 7, ingredient: 'missing' }, tiny), /Secret ingredient missing<\/span> · 8\.8 KB/);
+  });
+
+  it('states the ingredient result on every line of an ingredient episode', () => {
+    const sound = ep({ ingredient: { id: 'sound', text: 'Sound.' } });
+    assert.match(mechLine({ ...ok(), ingredient: 'present' }, sound), /secret ingredient check passed.*a source check, not a play test/);
+    assert.match(mechLine({ ...ok(), ingredient: 'unchecked' }, sound), /passed · secret ingredient not machine-checked<\/span>/);
+    assert.match(mechLine({ ...ok(), score: 9, mobileOverflow: true, ingredient: 'unchecked' }, sound), /Overflows on phone<\/span> · secret ingredient not machine-checked/);
+  });
 });
