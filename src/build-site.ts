@@ -406,7 +406,7 @@ function siteHeader(opts: { compact: boolean; root: string; status?: string; lat
 function siteFooter(repo: string | undefined, root = ''): string {
   return `<footer><p>Model output and scores are never edited. Recaps and labels are generated from the episode record by code.</p>
 <p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}"${evAttrs('outbound', { target: 'github' })}>github.com/${esc(repo)}</a>.` : ''}</p>
-${FEED ? `\n<p><a href="${root}feed.xml"${evAttrs('outbound', { target: 'feed' })}>Episode feed (Atom)</a></p>` : ''}${GA_ID ? `\n<p><button type="button" class="linkish" data-consent-open>Cookie settings</button></p>` : ''}</footer>`;
+<p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p>${FEED ? `\n<p><a href="${root}feed.xml"${evAttrs('outbound', { target: 'feed' })}>Episode feed (Atom)</a></p>` : ''}${GA_ID ? `\n<p><button type="button" class="linkish" data-consent-open>Cookie settings</button></p>` : ''}</footer>`;
 }
 
 /** The episode's own page, at s/<season>/ep-NN/index.html. */
