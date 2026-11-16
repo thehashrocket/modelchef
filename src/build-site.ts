@@ -64,6 +64,10 @@ tr.out td{color:var(--muted)}
 .badge.win{color:var(--good);border-color:currentColor}
 .badge.gone{color:var(--bad);border-color:currentColor}
 .mech{font-size:.82rem;color:var(--muted)}
+.mech .tick{color:var(--good);font-weight:700}
+.mech.bad{color:var(--ink)}
+.mech.bad .problems{color:var(--bad)}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 details{font-size:.92rem}
 summary{cursor:pointer;color:var(--accent);font-weight:600;padding:11px 0}
 a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}

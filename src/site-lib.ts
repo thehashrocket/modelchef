@@ -111,9 +111,40 @@ export function badgesFor(ep: Episode, e: Entry): string {
   return `<div class="badges">${badges.join('')}</div>`;
 }
 
-export function mechLine(m: MechReport | null, _ep: Episode): string {
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const kb = (bytes: number, precise: boolean) => `${(bytes / 1024).toFixed(precise ? 1 : 0)} KB`;
+
+/** What the machine check found wrong, in reading order. Counts only: dish output never goes in here. */
+export function mechProblems(m: MechReport): string[] {
+  const problems: string[] = [];
+  if (m.blank) problems.push('Rendered blank');
+  if (m.networkAttempts.length) problems.push(plural(m.networkAttempts.length, 'network attempt'));
+  if (m.consoleErrors.length) problems.push(plural(m.consoleErrors.length, 'console error'));
+  if (m.mobileOverflow) problems.push('Overflows on phone');
+  if (m.ingredient === 'missing') problems.push('Secret ingredient missing');
+  if (!m.hasTitle || !m.hasDescription) problems.push('Missing title or description');
+  return problems;
+}
+
+/**
+ * One line per dish: a quiet "passed" when nothing went wrong, the specific
+ * problems when something did. The size is always shown when size is the
+ * secret ingredient, and the ingredient result whenever the episode had one.
+ */
+export function mechLine(m: MechReport | null, ep: Episode): string {
   if (!m) return '';
-  return `<div class="mech">Machine check ${m.score}/10 · ${(m.bytes / 1024).toFixed(0)} KB · ${m.consoleErrors.length} console error${m.consoleErrors.length === 1 ? '' : 's'} · ${m.networkAttempts.length} network attempt${m.networkAttempts.length === 1 ? '' : 's'}${m.mobileOverflow ? ' · overflows on phone' : ''}${m.ingredient === 'missing' ? ' · secret ingredient missing' : ''}</div>`;
+  const tiny = ep.ingredient?.id === 'tiny';
+  const size = tiny ? ` · ${kb(m.bytes, true)}` : '';
+  const ingredient =
+    m.ingredient === 'present' ? ' · secret ingredient check passed'
+    : m.ingredient === 'unchecked' ? ' · secret ingredient not machine-checked'
+    : '';
+  const problems = mechProblems(m);
+  if (!problems.length) {
+    const detail = `Machine check passed, ${m.score}/10 · ${kb(m.bytes, tiny)} · no console errors · no network attempts${ingredient}${m.ingredient === 'present' ? ' (a source check, not a play test)' : ''}`;
+    return `<div class="mech ok"><span aria-hidden="true" title="${esc(detail)}"><span class="tick">✓</span> Machine check passed${size}${ingredient}</span><span class="sr">${esc(detail)}</span></div>`;
+  }
+  return `<div class="mech bad"><span aria-hidden="true">⚠</span> Machine check <b>${m.score}/10</b>: <span class="problems">${problems.join(' · ')}</span>${size}${ingredient}</div>`;
 }
 
 const shortName = (name: string) => name.replace(/^The /, '');
