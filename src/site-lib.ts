@@ -96,6 +96,8 @@ export function metaTags(m: MetaInput, siteUrl: string): string {
     tag('name', 'twitter:description', m.description),
   ];
   if (siteUrl) {
+    // The site answers on more than one host (custom domain and *.vercel.app); search engines index this one.
+    out.push(`<link rel="canonical" href="${esc(siteUrl + m.path)}">`);
     out.push(tag('property', 'og:url', siteUrl + m.path));
     if (m.image) {
       out.push(tag('property', 'og:image', siteUrl + m.image));
