@@ -2,7 +2,7 @@
 // import time, so tests can import these directly. build-site.ts does the I/O.
 //
 // Every string that came out of a model goes through esc() before it reaches HTML.
-import { CONTESTANTS, JUDGES } from './config';
+import { CONTESTANTS, JUDGES, SCORING } from './config';
 import { challengeText, RULES } from './prompts';
 import { SAME_FAMILY_REASON, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type MechReport } from './state';
 
@@ -26,6 +26,27 @@ export const TYPE_LABEL = { 'mystery-box': 'Mystery Box', invention: 'Invention 
 /** Where an episode's files live, relative to the site root. */
 export const epPath = (season: string, ep: Episode) => `s/${season}/ep-${pad(ep.number)}`;
 export const epAnchor = (season: string, ep: Episode) => `${season}-ep-${pad(ep.number)}`;
+
+/**
+ * A formatter for one set of scores shown together: 1 decimal, unless two
+ * different values would print the same at 1 decimal, then 2 decimals for the
+ * whole set. "Different" compares 2-decimal strings, so float noise never
+ * counts. With three or more values a single collision widens all of them.
+ */
+export function fmtScores(values: number[]): (v: number) => string {
+  const byOne = new Map<string, Set<string>>();
+  for (const v of values) {
+    const one = v.toFixed(1);
+    if (!byOne.has(one)) byOne.set(one, new Set());
+    byOne.get(one)!.add(v.toFixed(2));
+  }
+  const digits = [...byOne.values()].some((two) => two.size > 1) ? 2 : 1;
+  return (v: number) => v.toFixed(digits);
+}
+/** The formatter for one episode's dish scores. */
+export const episodeFmt = (ep: Episode) => fmtScores(ep.entries.filter((e) => !e.forfeit).map((e) => e.total));
+/** How a dish's score is made, from SCORING. */
+export const SCORE_EXPLAINED = `A dish's score is the judges' average × ${SCORING.judgeWeight} plus the machine check × ${SCORING.mechanicalWeight}.`;
 
 /** Judges see the pressure-test pair as "Dish A" and "Dish B"; readers should see who they mean. */
 export function nameDishes(reason: string, order?: [string, string]): string {
@@ -59,16 +80,22 @@ const counted = (ep: Episode) => {
 
 /** Plain text (escape it where it is used). The words "pressure test" may be linked by recapHtml(). */
 export function recapText(season: string, ep: Episode): string {
+  return recapParts(season, ep).join(' ');
+}
+
+/** The recap's sentences: what the winner did, then (outside a finale) how the pressure test went. */
+function recapParts(season: string, ep: Episode): [string] | [string, string] {
   const win = ep.entries.find((e) => e.contestant === ep.winner);
   const winner = chefName(ep.winner);
+  const f = episodeFmt(ep);
   if (ep.type === 'finale') {
     const runnerUp = ep.entries.find((e) => e.contestant === ep.eliminated);
-    if (!win || win.forfeit || !runnerUp) return `${winner} won.`;
-    return `${winner} is the ${seasonLabel(season)} champion, beating ${chefName(runnerUp.contestant)} ${win.total.toFixed(1)} to ${runnerUp.total.toFixed(1)}.`;
+    if (!win || win.forfeit || !runnerUp) return [`${winner} won.`];
+    return [`${winner} is the ${seasonLabel(season)} champion, beating ${chefName(runnerUp.contestant)} ${f(win.total)} to ${f(runnerUp.total)}.`];
   }
-  const first = !win || win.forfeit ? `${winner} won.` : `${winner} won with "${win.title}" (${win.total.toFixed(1)}).`;
+  const first = !win || win.forfeit ? `${winner} won.` : `${winner} won with "${win.title}" (${f(win.total)}).`;
   const p = ep.pressure;
-  if (!p) return first;
+  if (!p) return [first];
   const out = chefName(p.eliminated);
   const survivor = chefName(p.chefs.find((id) => id !== p.eliminated) ?? '');
   const tally = counted(ep);
@@ -88,14 +115,15 @@ export function recapText(season: string, ep: Episode): string {
   } else {
     second = `No judge could pick a pressure-test winner, so the main-round score sent ${out} home.`;
   }
-  return `${first} ${second}`;
+  return [first, second];
 }
 
 /** The recap as HTML, with "pressure test" linking to the pressure block (always on the same page as the recap). */
 export function recapHtml(season: string, ep: Episode): string {
-  const text = esc(recapText(season, ep));
-  if (!ep.pressure) return text;
-  return text.replace('pressure test', `<a href="#${epAnchor(season, ep)}-pressure">pressure test</a>`);
+  const [first, second] = recapParts(season, ep);
+  if (!second) return esc(first);
+  // Only the generated sentence is linked: the first one carries a model-written dish title.
+  return `${esc(first)} ${esc(second).replace('pressure test', `<a href="#${epAnchor(season, ep)}-pressure">pressure test</a>`)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +218,8 @@ function plate(season: string, ep: Episode, e: Entry, root: string): string {
     : `<a class="shot" href="${base}/play-${e.contestant}.html"><img loading="lazy" src="${base}/shots/${e.contestant}-desktop.jpg" alt="Screenshot of ${esc(e.title)}" width="1280" height="800"></a>`;
 }
 
-const scoreText = (e: Entry) => (e.forfeit ? '–' : e.total.toFixed(1));
+const scoreText = (ep: Episode, e: Entry) =>
+  e.forfeit ? '–' : `<span title="${esc(SCORE_EXPLAINED)}">${episodeFmt(ep)(e.total)}</span><span class="outof">/10</span>`;
 const openLink = (season: string, ep: Episode, e: Entry, root: string) =>
   e.forfeit ? '' : `<a class="play" href="${root}${epPath(season, ep)}/play-${e.contestant}.html">Open the dish &rarr;</a>`;
 const presentation = (e: Entry) =>
@@ -198,7 +227,7 @@ const presentation = (e: Entry) =>
 
 export function card(season: string, ep: Episode, e: Entry, root = ''): string {
   return `<article class="card">${plate(season, ep, e, root)}<div class="body">
-<div class="row"><h3>${rankSpan(ep, e)} ${esc(e.title)}</h3><span class="score">${scoreText(e)}</span></div>
+<div class="row"><h3>${rankSpan(ep, e)} ${esc(e.title)}</h3><span class="score">${scoreText(ep, e)}</span></div>
 <div class="by">${esc(chefName(e.contestant))}</div>
 ${badgesFor(ep, e)}
 ${e.forfeit ? '' : `<p class="pitch">${esc(e.pitch)}</p>`}
@@ -212,7 +241,7 @@ ${openLink(season, ep, e, root)}
 export function featuredCard(season: string, ep: Episode, e: Entry, root = ''): string {
   // A <details> cannot open by screen width, so the critiques render twice: bare on wide screens, folded on narrow ones.
   return `<article class="feature">${plate(season, ep, e, root)}<div class="body">
-<div class="row"><h3>${rankSpan(ep, e)} ${esc(e.title)}</h3><span class="score">${scoreText(e)}</span></div>
+<div class="row"><h3>${rankSpan(ep, e)} ${esc(e.title)}</h3><span class="score">${scoreText(ep, e)}</span></div>
 <div class="by">${esc(chefName(e.contestant))}</div>
 ${badgesFor(ep, e)}
 ${e.forfeit ? '' : `<p class="pitch">${esc(e.pitch)}</p>`}

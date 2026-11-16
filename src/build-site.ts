@@ -4,7 +4,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DATA_DIR, JUDGES } from './config';
-import { chefName, episodeBlock, esc, isPilot, pad, recapHtml, seasonLabel } from './site-lib';
+import { chefName, episodeBlock, esc, fmtScores, isPilot, pad, recapHtml, SCORE_EXPLAINED, seasonLabel } from './site-lib';
 import { average, type Episode, type SeasonState } from './state';
 
 const OUT = 'dist';
@@ -43,13 +43,16 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 tr.out td{color:var(--muted)}
 .scroll{overflow-x:auto}
 @media (max-width:560px){th,td{padding:9px 10px}th:nth-child(n+4),td:nth-child(n+4){display:none}td:first-child{min-width:9.5em}}
+@media (max-width:400px){td:first-child{min-width:0}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(310px,100%),1fr));gap:18px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
 .card img{width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;border-bottom:1px solid var(--line);background:var(--line)}
 .noshot{aspect-ratio:16/10;display:grid;place-items:center;color:var(--muted);border-bottom:1px solid var(--line);padding:16px;text-align:center}
 .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
 .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.score{font:700 1.5rem/1 Georgia,serif;font-variant-numeric:tabular-nums}
+.score{font:700 1.5rem/1 Georgia,serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.outof{font:600 .8rem system-ui;color:var(--muted);margin-left:2px}
+
 .by{color:var(--muted);font-size:.9rem}
 .pitch{margin:0}
 .says p{margin:8px 0 0;color:var(--muted);font-style:italic}
@@ -60,7 +63,7 @@ tr.out td{color:var(--muted)}
 .panel b{color:var(--ink)}
 .latest{font-weight:600}
 .badges{display:flex;flex-wrap:wrap;gap:6px}
-.badge{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.badge{white-space:nowrap;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
 .badge.win{color:var(--good);border-color:currentColor}
 .badge.gone{color:var(--bad);border-color:currentColor}
 .mech{font-size:.82rem;color:var(--muted)}
@@ -138,18 +141,19 @@ iframe{flex:1;border:0;width:100%;background:#fff}
 
 function seasonSection(season: string, state: SeasonState, episodes: Episode[]): string {
   const left = Object.values(state.contestants).filter((c) => c.status === 'active').length;
-  const rows = Object.entries(state.contestants)
-    .map(([id, c]) => ({ id, c, avg: average(c.history), wins: c.history.filter((h) => h.outcome === 'won').length }))
+  const ranked = Object.entries(state.contestants).map(([id, c]) => ({ id, c, avg: average(c.history), wins: c.history.filter((h) => h.outcome === 'won').length }));
+  const fmt = fmtScores(ranked.filter((r) => r.c.history.length).map((r) => r.avg));
+  const rows = ranked
     .sort((a, b) => {
       const order = (x: typeof a) => (x.c.status === 'champion' ? 1e6 : x.c.status === 'active' ? 1e5 : (x.c.eliminatedIn ?? 0));
       return order(b) - order(a) || b.avg - a.avg;
     })
     .map(({ id, c, avg, wins }) => {
       const status =
-        c.status === 'champion' ? 'Champion'
-        : c.status === 'active' ? (state.immune === id && left > 3 ? 'In (immune)' : 'In')
-        : `Out in episode ${c.eliminatedIn}`;
-      return `<tr class="${c.status === 'eliminated' ? 'out' : ''}"><td>${esc(chefName(id))}</td><td>${status}</td><td class="num">${c.history.length ? avg.toFixed(2) : '–'}</td><td class="num">${wins}</td><td class="num">${c.history.length}</td></tr>`;
+        c.status === 'champion' ? '<span class="badge win">Champion</span>'
+        : c.status === 'active' ? (state.immune === id && left > 3 ? 'In <span class="badge">Immune</span>' : 'In')
+        : `<span class="badge gone">Out · Ep ${c.eliminatedIn}</span>`;
+      return `<tr class="${c.status === 'eliminated' ? 'out' : ''}"><td>${esc(chefName(id))}</td><td class="status-cell">${status}</td><td class="num">${c.history.length ? fmt(avg) : '–'}</td><td class="num">${wins}</td><td class="num">${c.history.length}</td></tr>`;
     })
     .join('');
 
@@ -163,8 +167,8 @@ ${eps.replace('<h2>', '<h3 class="pilot">').replace('</h2>', '</h3>')}`;
   }
 
   return `<h2>Standings, ${esc(seasonLabel(season))}</h2>
-<p class="sub">Season average of each chef's episode scores, out of 10.</p>
-<div class="scroll"><table><thead><tr><th>Chef</th><th>Status</th><th class="num">Average</th><th class="num">Wins</th><th class="num">Dishes</th></tr></thead><tbody>${rows}</tbody></table></div>
+<p class="sub">Season average of each chef's episode scores. ${esc(SCORE_EXPLAINED)}</p>
+<div class="scroll"><table><thead><tr><th>Chef</th><th>Status</th><th class="num">Average /10</th><th class="num">Wins</th><th class="num">Dishes</th></tr></thead><tbody>${rows}</tbody></table></div>
 ${eps}`;
 }
 

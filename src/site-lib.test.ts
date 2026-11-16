@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { card, featuredCard, mechLine, mechProblems, recapText, tieTitle } from './site-lib';
+import { card, featuredCard, fmtScores, mechLine, mechProblems, recapText, tieTitle } from './site-lib';
 import type { DuelVote, Entry, Episode, PressureTest } from './state';
 
 const entry = (contestant: string, total: number, over: Partial<Entry> = {}): Entry => ({
@@ -183,5 +183,19 @@ describe('mechLine', () => {
     assert.match(mechLine({ ...ok(), ingredient: 'present' }, sound), /secret ingredient check passed.*a source check, not a play test/);
     assert.match(mechLine({ ...ok(), ingredient: 'unchecked' }, sound), /passed · secret ingredient not machine-checked<\/span>/);
     assert.match(mechLine({ ...ok(), score: 9, mobileOverflow: true, ingredient: 'unchecked' }, sound), /Overflows on phone<\/span> · secret ingredient not machine-checked/);
+  });
+});
+
+describe('fmtScores', () => {
+  it('uses 2 decimals for the whole set when two different values collide at 1', () => {
+    const f = fmtScores([6.04, 6.01, 5.5]);
+    assert.deepEqual([6.04, 6.01, 5.5].map(f), ['6.04', '6.01', '5.50']);
+  });
+  it('uses 1 decimal when nothing collides', () => {
+    const f = fmtScores([8.24, 7.92, 6.96, 6.6, 5.907, 5.733]);
+    assert.deepEqual([8.24, 7.92, 6.96, 6.6, 5.907, 5.733].map(f), ['8.2', '7.9', '7.0', '6.6', '5.9', '5.7']);
+  });
+  it('ignores float noise and true equals', () => {
+    assert.equal(fmtScores([0.1 + 0.2, 0.3, 4])(0.3), '0.3');
   });
 });
