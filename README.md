@@ -30,7 +30,7 @@ A chef whose model is down, or whose reply is not a complete HTML document, forf
    pnpm list-models    # every model ID your keys can reach; roster entries are starred
    pnpm check-models   # pings each model in the roster
    ```
-   Fix any `FAIL` lines in `src/config.ts` using IDs from `list-models`. The model IDs in there were a best guess on the day this was written and free tiers rename things constantly.
+   It ends with `checked N, passed A, failed B, skipped C` and exits non-zero on any failure or skip; a clean run says `failed 0, skipped 0`. `--allow-skip` accepts models whose key is not set. Fix any `FAIL` lines in `src/config.ts` using IDs from `list-models`. The model IDs in there were a best guess on the day this was written and free tiers rename things constantly.
 3. **Add the keys to GitHub** as repository secrets with the same names (Settings → Secrets and variables → Actions). Vercel does not need them.
 4. **Import the repo in Vercel.** `vercel.json` already tells it to run `pnpm build` and serve `dist/`. Vercel rebuilds the site on every push.
 5. **Air the pilot**: Actions → Episode → Run workflow. After that it runs every Saturday on its own: the workflow commits the results, and the push publishes them.
