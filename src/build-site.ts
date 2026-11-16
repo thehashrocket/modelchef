@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { CONTESTANTS, DATA_DIR, JUDGES, SEASON } from './config';
 import {
   chefName,
+  dishChrome,
   episodeBlock,
   epAnchor,
   epPath,
@@ -21,9 +22,10 @@ import {
   SCORE_EXPLAINED,
   seasonLabel,
   TYPE_LABEL,
+  type DishLink,
   type MetaInput,
 } from './site-lib';
-import { average, type Episode, type SeasonState } from './state';
+import { average, type Entry, type Episode, type SeasonState } from './state';
 
 const OUT = 'dist';
 
@@ -37,12 +39,36 @@ function lockDown(html: string): string {
   return CSP + html;
 }
 
-const STYLE = `
+/** Shared by every page, the dish pages included: tokens (light and dark), badges, chips, notes, focus. */
+const BASE_STYLE = `
 :root{--bg:#faf7f2;--card:#fff;--ink:#1d1a16;--muted:#6f675c;--line:#e4dccf;--accent:#c2410c;--good:#15803d;--bad:#b91c1c}
 @media (prefers-color-scheme:dark){:root{--bg:#15130f;--card:#1f1c17;--ink:#f1ece3;--muted:#a59c8e;--line:#342f27;--accent:#fb923c;--good:#4ade80;--bad:#f87171}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
 a{color:var(--accent)}
+.jrow{display:flex;flex-wrap:wrap;gap:6px;font-size:.8rem;font-variant-numeric:tabular-nums}
+.jrow span{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted)}
+.jrow b{color:var(--ink);font-weight:600}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.badge{white-space:nowrap;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.badge.win{color:var(--good);border-color:currentColor}
+.badge.gone{color:var(--bad);border-color:currentColor}
+.mech{font-size:.82rem;color:var(--muted)}
+.mech .tick{color:var(--good);font-weight:700}
+.mech.bad{color:var(--ink)}
+.mech.bad .problems{color:var(--bad)}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+details{font-size:.92rem}
+summary{cursor:pointer;color:var(--accent);font-weight:600;padding:11px 0}
+a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+blockquote{margin:10px 0 0;padding-left:12px;border-left:3px solid var(--line)}
+blockquote b{display:block}
+blockquote small{color:var(--muted)}
+.prov{display:block;color:var(--muted);font-size:.78rem}
+.notes h4{margin:6px 0 0;font-size:.92rem;color:var(--muted)}
+`;
+
+const STYLE = `${BASE_STYLE}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
 .wrap{max-width:1120px;margin:0 auto;padding:0 20px 80px}
 header{padding:56px 0 28px;border-bottom:1px solid var(--line)}
 h1{font:700 clamp(2.4rem,6vw,3.6rem)/1 Georgia,"Times New Roman",serif;margin:0;letter-spacing:-.02em}
@@ -70,32 +96,12 @@ tr.out td{color:var(--muted)}
 .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .score{font:700 1.5rem/1 Georgia,serif;font-variant-numeric:tabular-nums;white-space:nowrap}
 .outof{font:600 .8rem system-ui;color:var(--muted);margin-left:2px}
-
 .by{color:var(--muted);font-size:.9rem}
 .pitch{margin:0}
 .says p{margin:8px 0 0;color:var(--muted);font-style:italic}
-.jrow{display:flex;flex-wrap:wrap;gap:6px;font-size:.8rem;font-variant-numeric:tabular-nums}
-.jrow span{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted)}
-.jrow b{color:var(--ink);font-weight:600}
 .panel{color:var(--muted);font-size:.92rem;margin:10px 0 0;max-width:72ch}
 .panel b{color:var(--ink)}
 .latest{font-weight:600}
-.badges{display:flex;flex-wrap:wrap;gap:6px}
-.badge{white-space:nowrap;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
-.badge.win{color:var(--good);border-color:currentColor}
-.badge.gone{color:var(--bad);border-color:currentColor}
-.mech{font-size:.82rem;color:var(--muted)}
-.mech .tick{color:var(--good);font-weight:700}
-.mech.bad{color:var(--ink)}
-.mech.bad .problems{color:var(--bad)}
-.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-details{font-size:.92rem}
-summary{cursor:pointer;color:var(--accent);font-weight:600;padding:11px 0}
-a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
-blockquote{margin:10px 0 0;padding-left:12px;border-left:3px solid var(--line)}
-blockquote b{display:block}
-blockquote small{color:var(--muted)}
-.prov{display:block;color:var(--muted);font-size:.78rem}
 .play{margin-top:auto;font-weight:700}
 .recap{font-size:1.05rem;color:var(--ink);max-width:70ch;margin:0 0 18px;overflow-wrap:anywhere}
 .status .recap-line{font-weight:400;overflow-wrap:anywhere}
@@ -104,7 +110,6 @@ h3{overflow-wrap:anywhere}
 .feature h3{font-size:1.6rem}
 .feature .shot{align-self:start}
 .feature img{width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;background:var(--line)}
-.notes h4{margin:6px 0 0;font-size:.92rem;color:var(--muted)}
 .wide-only{display:none}
 @media (min-width:760px){.feature{grid-template-columns:11fr 9fr}.feature .shot{border-right:1px solid var(--line)}.wide-only{display:block}.narrow-only{display:none}}
 .brief{margin:0 0 18px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
@@ -148,26 +153,53 @@ ${meta}
 `;
 }
 
-function playPage(title: string, chef: string, src: string, meta = ''): string {
+/**
+ * A dish on its own page: a bar (back, title, chef, rank, score, prev/next,
+ * Verdict) over the sandboxed iframe. The Verdict script only toggles the
+ * panel; it never reads from the dish or listens for messages.
+ */
+function playPage(opts: { title: string; pageTitle: string; bar: string; panel: string; src: string; meta: string }): string {
+  const { title, src } = opts;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} · ModelChef</title>
-${meta}
-<style>
+<title>${esc(opts.pageTitle)}</title>
+${opts.meta}
+<style>${BASE_STYLE}
 html,body{height:100%;margin:0}
-body{display:flex;flex-direction:column;font:15px system-ui,sans-serif;background:#15130f;color:#f1ece3}
-nav{display:flex;gap:14px;align-items:center;padding:8px 14px;border-bottom:1px solid #342f27;white-space:nowrap;overflow:hidden}
-nav a{color:#fb923c;font-weight:700;text-decoration:none}
-nav span{overflow:hidden;text-overflow:ellipsis;color:#a59c8e}
-iframe{flex:1;border:0;width:100%;background:#fff}
+body{display:flex;flex-direction:column;font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+.bar{display:grid;grid-template-columns:auto minmax(12ch,1fr) auto;grid-template-areas:"back t vbtn" "r2 r2 r2";align-items:center;gap:0 12px;padding:4px 12px;border-bottom:1px solid var(--line);background:var(--card)}
+.bar .back{grid-area:back}.bar .t{grid-area:t}.bar .vbtn{grid-area:vbtn}
+.r2{grid-area:r2;display:flex;align-items:center;gap:12px;min-width:0}
+.bar a{font-weight:700;text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
+.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.m{flex:1;color:var(--muted);font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pn{display:flex;gap:14px;flex-shrink:0;white-space:nowrap;font-size:.9rem}
+.vbtn{min-height:44px;margin:0;padding:0 14px;border:1px solid var(--accent);border-radius:99px;background:none;color:var(--accent);font:inherit;font-weight:700;cursor:pointer}
+.vbtn[aria-expanded="true"]{background:var(--accent);color:var(--card)}
+@media (max-width:559px){.wl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}}
+@media (min-width:560px){.bar{grid-template-columns:auto minmax(12ch,1fr) auto auto;grid-template-areas:"back t r2 vbtn"}.m{flex:0 1 auto}}
+#verdict{max-height:45vh;overflow:auto;padding:4px 16px 14px;border-bottom:1px solid var(--line);background:var(--card)}
+#verdict[hidden]{display:none}
+#verdict>*{max-width:72ch}
+#verdict .pitch{margin:10px 0 0}
+#verdict .fine{color:var(--muted);font-size:.85rem;margin:12px 0 0}
+#verdict ul{padding-left:20px}
+iframe{flex:1;min-height:0;border:0;width:100%;background:#fff}
 </style>
 </head>
 <body>
-<nav><a href="../../../index.html">&larr; ModelChef</a><b>${esc(title)}</b><span>by ${esc(chef)} · unedited model output</span></nav>
+${opts.bar}
+<section id="verdict" aria-label="Verdict" hidden>${opts.panel}</section>
 <iframe src="${esc(src)}" sandbox="allow-scripts allow-forms allow-modals allow-downloads allow-pointer-lock" title="${esc(title)}"></iframe>
+<script>
+const b = document.querySelector('.vbtn'), v = document.getElementById('verdict');
+const set = (open) => { v.hidden = !open; b.setAttribute('aria-expanded', String(open)); };
+b.addEventListener('click', () => set(v.hidden));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !v.hidden) { set(false); b.focus(); } });
+</script>
 </body>
 </html>
 `;
@@ -300,27 +332,38 @@ function publishEpisode(season: string, ep: Episode, prev: Episode | undefined, 
   if (existsSync(join(src, 'og.jpg'))) cpSync(join(src, 'og.jpg'), join(out, 'og.jpg'));
 
   const base = epPath(season, ep);
-  for (const e of ep.entries) {
-    if (e.forfeit) continue;
+  const served = ep.entries.filter((e) => !e.forfeit).sort((a, b) => a.rank - b.rank);
+  const link = (e: Entry): DishLink => ({ href: `play-${e.contestant}.html`, label: `${e.title} by ${chefName(e.contestant)}` });
+  served.forEach((e, i) => {
     writeFileSync(join(out, 'apps', `${e.contestant}.html`), lockDown(readFileSync(join(src, 'apps', `${e.contestant}.html`), 'utf8')));
+    const pageTitle = `${e.title} by ${chefName(e.contestant)} · ModelChef`;
     const meta = share(
-      { title: `${e.title} by ${chefName(e.contestant)} · ModelChef`, description: e.pitch || `${e.title} by ${chefName(e.contestant)}, Episode ${ep.number} of ModelChef`, path: `/${base}/play-${e.contestant}.html` },
+      { title: pageTitle, description: e.pitch || `${e.title} by ${chefName(e.contestant)}, Episode ${ep.number} of ModelChef`, path: `/${base}/play-${e.contestant}.html` },
       `${base}/shots/${e.contestant}-desktop.jpg`,
       1280,
       800,
     );
-    writeFileSync(join(out, `play-${e.contestant}.html`), playPage(e.title, chefName(e.contestant), `apps/${e.contestant}.html`, meta));
-  }
-  for (const id of ep.pressure?.chefs ?? []) {
-    if (ep.pressure!.forfeits[id]) continue;
+    const prev = served[i - 1];
+    const next = served[i + 1];
+    const chrome = dishChrome(season, ep, { entry: e, prev: prev && link(prev), next: next && link(next) });
+    writeFileSync(join(out, `play-${e.contestant}.html`), playPage({ title: e.title, pageTitle, ...chrome, src: `apps/${e.contestant}.html`, meta }));
+  });
+  const p = ep.pressure;
+  for (const id of p?.chefs ?? []) {
+    if (p!.forfeits[id]) continue;
     writeFileSync(join(out, 'pressure', `${id}.html`), lockDown(readFileSync(join(src, 'pressure', `${id}.html`), 'utf8')));
+    const pageTitle = `Pressure test: ${chefName(id)} · ModelChef`;
     const meta = share(
-      { title: `Pressure test: ${chefName(id)} · ModelChef`, description: ep.pressure!.spec, path: `/${base}/play-pressure-${id}.html` },
+      { title: pageTitle, description: p!.spec, path: `/${base}/play-pressure-${id}.html` },
       `${base}/shots/pressure-${id}-desktop.jpg`,
       1280,
       800,
     );
-    writeFileSync(join(out, `play-pressure-${id}.html`), playPage('Pressure test', chefName(id), `pressure/${id}.html`, meta));
+    // The other chef's dish, when there was one.
+    const otherId = p!.chefs.find((c) => c !== id);
+    const other = otherId && !p!.forfeits[otherId] ? { href: `play-pressure-${otherId}.html`, label: chefName(otherId) } : undefined;
+    const chrome = dishChrome(season, ep, { pressureChef: id, other });
+    writeFileSync(join(out, `play-pressure-${id}.html`), playPage({ title: 'Pressure test', pageTitle, ...chrome, src: `pressure/${id}.html`, meta }));
   }
   // The pilot stays on the home page only.
   if (!isPilot(season)) writeFileSync(join(out, 'index.html'), episodePage(season, ep, prev, next, repo));

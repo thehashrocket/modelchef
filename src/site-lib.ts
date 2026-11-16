@@ -349,3 +349,53 @@ ${briefBlock(ep)}
 <div class="grid">${rest.map((e) => card(season, ep, e, root)).join('')}</div>
 ${pressureBlock(season, ep, root)}`;
 }
+
+// ---------------------------------------------------------------------------
+// The dish page: a bar over the sandboxed iframe, and a Verdict panel.
+
+export interface DishLink {
+  href: string;
+  label: string;
+}
+
+/** The bar and Verdict panel for a dish page. The page shell and the iframe live in build-site.ts. */
+export function dishChrome(
+  season: string,
+  ep: Episode,
+  opts: { entry?: Entry; pressureChef?: string; prev?: DishLink; next?: DishLink; other?: DishLink },
+): { bar: string; panel: string } {
+  const back = `<a class="back" href="index.html">&larr;<span class="wl"> Episode ${ep.number}</span></a>`;
+  const verdict = `<button type="button" class="vbtn" aria-expanded="false" aria-controls="verdict">Verdict</button>`;
+  const footer = `<p class="fine">Unedited model output. The dish runs sandboxed with the network blocked.</p>
+<p><a href="../../../index.html">What is ModelChef? &rarr;</a></p>`;
+
+  if (opts.entry) {
+    const e = opts.entry;
+    const nav = [
+      opts.prev ? `<a href="${opts.prev.href}" aria-label="Previous dish: ${esc(opts.prev.label)}">&lsaquo; Prev</a>` : '',
+      opts.next ? `<a href="${opts.next.href}" aria-label="Next dish: ${esc(opts.next.label)}">Next &rsaquo;</a>` : '',
+    ].join('');
+    const bar = `<header class="bar">${back}<b class="t">${esc(e.title)}</b><span class="r2"><span class="m">by ${esc(chefName(e.contestant))} · #${e.rank} · ${episodeFmt(ep)(e.total)}/10</span><span class="pn">${nav}</span></span>${verdict}</header>`;
+    const panel = `${e.pitch ? `<p class="pitch">${esc(e.pitch)}</p>` : ''}
+${e.judges.length ? notesBlock(ep, e, true) : '<p>Not judged.</p>'}
+${mechLine(e.mech, ep)}
+${footer}`;
+    return { bar, panel };
+  }
+
+  const id = opts.pressureChef!;
+  const p = ep.pressure!;
+  const chef = chefName(id);
+  const picks = p.votes.filter((v) => v.winner === id).length;
+  const nav = opts.other ? `<a href="${opts.other.href}">Other dish: ${esc(opts.other.label)} &rsaquo;</a>` : '';
+  const bar = `<header class="bar">${back}<b class="t">Pressure test</b><span class="r2"><span class="m">by ${esc(chef)}</span><span class="pn">${nav}</span></span>${verdict}</header>`;
+  const votes = p.votes
+    .map((v) => `<li><b>${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${nameDishes(v.reason, v.order)}${provenance(ep, v)}</li>`)
+    .join('');
+  const panel = `<p><b>The spec:</b> ${esc(p.spec)}</p>
+<p>Picked by ${picks} of ${p.votes.length} judge${p.votes.length === 1 ? '' : 's'}.</p>
+${votes ? `<ul class="votes">${votes}</ul>` : ''}
+<p><b>${esc(chef)} ${p.eliminated === id ? 'went home' : 'survived the pressure test'}.</b></p>
+${footer}`;
+  return { bar, panel };
+}

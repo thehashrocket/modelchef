@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { card, featuredCard, fmtScores, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
+import { card, dishChrome, featuredCard, fmtScores, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
 import type { DuelVote, Entry, Episode, PressureTest } from './state';
 
 const entry = (contestant: string, total: number, over: Partial<Entry> = {}): Entry => ({
@@ -236,5 +236,37 @@ describe('resolveSiteUrl', () => {
   it('uses the Vercel production URL only on production builds', () => {
     assert.equal(resolveSiteUrl({ VERCEL_ENV: 'production', VERCEL_PROJECT_PRODUCTION_URL: 'x.vercel.app' }).url, 'https://x.vercel.app');
     assert.equal(resolveSiteUrl({ VERCEL_ENV: 'preview', VERCEL_PROJECT_PRODUCTION_URL: 'x.vercel.app' }).url, '');
+  });
+});
+
+describe('dishChrome', () => {
+  it('main-round bar: title, chef, rank, score; no dead links at the ends', () => {
+    const ep = episode(null);
+    const { bar } = dishChrome('season-01', ep, { entry: ep.entries[0]!, next: { href: 'play-gpt-oss.html', label: 'x' } });
+    assert.match(bar, /<b class="t">gemini-flash dish<\/b>/);
+    assert.match(bar, /by Gemini 3\.8 Flash · #1 · 8\.2\/10/);
+    assert.match(bar, /href="play-gpt-oss\.html"[^>]*>Next/);
+    assert.ok(!bar.includes('Prev'));
+    assert.match(bar, /<button type="button" class="vbtn" aria-expanded="false" aria-controls="verdict">Verdict<\/button>/);
+  });
+  it('a dish with no judges says so', () => {
+    const ep = episode(null);
+    assert.match(dishChrome('season-01', ep, { entry: ep.entries[1]! }).panel, /<p>Not judged\.<\/p>/);
+  });
+  it('pressure panel: picks, outcome, and the other dish only when it was served', () => {
+    const ep = episode({ votes: [vote('gpt-oss'), vote('gpt-oss'), vote(null)] });
+    const lost = dishChrome('season-01', ep, { pressureChef: 'cohere-north', other: { href: 'play-pressure-gpt-oss.html', label: 'GPT-OSS 120B' } });
+    assert.match(lost.panel, /Picked by 0 of 3 judges\./);
+    assert.match(lost.panel, /Cohere North Mini Code went home\./);
+    assert.match(lost.bar, /Other dish: GPT-OSS 120B/);
+    const won = dishChrome('season-01', ep, { pressureChef: 'gpt-oss' });
+    assert.match(won.panel, /Picked by 2 of 3 judges\..*GPT-OSS 120B survived the pressure test\./s);
+    assert.ok(!won.bar.includes('Other dish'));
+  });
+  it('escapes model text', () => {
+    const ep = episode(null);
+    const e = { ...ep.entries[0]!, title: `"><script>x</script>'&`, pitch: `"><script>x</script>'&` };
+    const { bar, panel } = dishChrome('season-01', ep, { entry: e, prev: { href: 'p.html', label: `"><script>` } });
+    assert.ok(!(bar + panel).includes('<script'));
   });
 });
