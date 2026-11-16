@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mise en Place — Prep Timer</title>
+<meta name="description" content="A reverse prep timer for home cooks and line cooks who need every component of a meal to finish at the same moment.">
+<style>
+  :root{
+    --ink:#1c1917;
+    --paper:#faf7f2;
+    --card:#ffffff;
+    --line:#e7dfd2;
+    --muted:#7c7367;
+    --accent:#c2410c;
+    --accent-soft:#fff1e8;
+    --ok:#15803d;
+    --warn:#b45309;
+    --shadow:0 1px 2px rgba(28,25,23,.06), 0 8px 24px -12px rgba(28,25,23,.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:16px;
+    line-height:1.5;
+    -webkit-text-size-adjust:100%;
+    overflow-x:hidden;
+  }
+  .wrap{
+    width:100%;
+    max-width:880px;
+    margin:0 auto;
+    padding:22px 16px 64px;
+  }
+  header.top{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .mark{
+    width:38px;height:38px;flex:0 0 auto;
+    border-radius:11px;
+    background:linear-gradient(150deg,#ea580c,#9a3412);
+    display:grid;place-items:center;
+    color:#fff;font-weight:700;font-size:19px;
+    box-shadow:0 6px 14px -6px rgba(154,52,18,.7);
+  }
+  h1{
+    font-size:20px;margin:0;letter-spacing:-.02em;font-weight:700;
+  }
+  .sub{
+    font-size:12.5px;color:var(--muted);margin-top:1px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card.flush{padding:0;overflow:hidden;}
+
+  /* ---------- clock ---------- */
+  .clockcard{
+    background:linear-gradient(165deg,#211e1b,#151311);
+    color:#f5f0e8;
+    border:none;
+  }
+  .clockrow{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+  .clocklabel{
+    font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:#a8a29a;font-weight:600;
+  }
+  .clocktime{
+    font-variant-numeric:tabular-nums;
+    font-size:clamp(38px,11vw,54px);
+    line-height:1.05;
+    font-weight:650;
+    letter-spacing:-.03em;
+    margin:4px 0 2px;
+  }
+  .clocktime.done{color:#fca5a5;}
+  .nextup{
+    font-size:13px;color:#a8a29a;min-height:20px;
+  }
+  .nextup b{color:#fdba74;font-weight:650;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+  button{
+    font:inherit;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--ink);
+    padding:9px 14px;
+    cursor:pointer;
+    transition:transform .06s ease, background .15s ease, border-color .15s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button:active{transform:translateY(1px);}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .clockcard button{
+    background:#2c2825;border-color:#413b36;color:#f5f0e8;
+  }
+  .clockcard button:hover{background:#3a3531;}
+  .btn-primary{
+    background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;
+  }
+  .btn-primary:hover{background:#9a3412;border-color:#9a3412;}
+  .btn-ghost{background:transparent;}
+
+  /* ---------- fields ---------- */
+  .fields{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-top:14px;}
+  .field label{
+    display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);font-weight:650;margin-bottom:4px;
+  }
+  input[type=text],input[type=time],input[type=number]{
+    width:100%;
+    font:inherit;
+    padding:9px 11px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--ink);
+    min-width:0;
+  }
+  input[type=time]{font-variant-numeric:tabular-nums;}
+  input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:5px;}
+
+  /* ---------- tasks ---------- */
+  .tasklist{display:flex;flex-direction:column;}
+  .task{
+    display:grid;
+    grid-template-columns:34px 1fr auto;
+    gap:10px;
+    align-items:center;
+    padding:11px 14px;
+    border-bottom:1px solid var(--line);
+    position:relative;
+  }
+  .task:last-child{border-bottom:none;}
+  .task.done{background:#fbfaf7;}
+  .task.done .tname{text-decoration:line-through;color:#a8a29a;}
+  .check{
+    width:26px;height:26px;border-radius:8px;
+    border:1.5px solid #d6ccbd;background:#fff;
+    display:grid;place-items:center;
+    cursor:pointer;padding:0;flex:0 0 auto;
+  }
+  .check svg{display:none;}
+  .task.done .check{background:var(--ok);border-color:var(--ok);}
+  .task.done .check svg{display:block;}
+  .tname{font-weight:600;font-size:14.5px;word-break:break-word;}
+  .tmeta{font-size:12px;color:var(--muted);margin-top:1px;}
+  .twhen{
+    font-size:12.5px;font-variant-numeric:tabular-nums;
+    text-align:right;white-space:nowrap;
+  }
+  .twhen .pill{
+    display:inline-block;
+    padding:3px 9px;border-radius:999px;
+    font-weight:600;font-size:12px;
+    background:#f1ece3;color:#5b5348;
+  }
+  .twhen .pill.now{background:#fee2e2;color:#b91c1c;}
+  .twhen .pill.soon{background:#fef3c7;color:#92400e;}
+  .twhen .pill.later{background:#e0f2fe;color:#075985;}
+  .twhen .pill.done{background:#dcfce7;color:#166534;}
+  .twhen small{display:block;color:var(--muted);margin-top:3px;font-size:11px;}
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:2px;}
+  .mini{
+    padding:3px 8px;font-size:11.5px;border-radius:7px;
+    color:var(--muted);background:transparent;border:1px solid transparent;
+  }
+  .mini:hover{background:#f5f0e8;color:var(--ink);border-color:var(--line);}
+  .mini.danger:hover{background:#fee2e2;color:#b91c1c;border-color:#fecaca;}
+
+  /* ---------- add form ---------- */
+  .addgrid{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:8px;align-items:end;}
+  .addgrid .field label{margin-bottom:3px;}
+  .addgrid .go{height:38px;white-space:nowrap;}
+  .empty{padding:22px 16px;text-align:center;color:var(--muted);font-size:13.5px;}
+
+  .foot{
+    display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    font-size:11.5px;color:var(--muted);margin-top:18px;
+  }
+  .sr{
+    position:absolute;width:1px;height:1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;
+  }
+  @media (max-width:560px){
+    .wrap{padding:16px 12px 56px;}
+    .fields{grid-template-columns:1fr;}
+    .addgrid{grid-template-columns:1fr 1fr;}
+    .addgrid .go{grid-column:1 / -1;width:100%;}
+    .task{grid-template-columns:30px 1fr;grid-template-areas:"c m" "w w";}
+    .task .check{grid-area:c;}
+    .task .tmain{grid-area:m;}
+    .task .twhen{grid-area:w;text-align:left;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .task .twhen small{margin-top:0;}
+    .row-actions{justify-content:flex-start;}
+    h1{font-size:18px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">M</div>
+      <div>
+        <h1>Mise en Place</h1>
+        <div class="sub">Reverse prep timer — everything lands at once.</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- CLOCK -->
+  <section class="card clockcard" aria-label="Countdown">
+    <div class="clockrow">
+      <div>
+        <div class="clocklabel">Next to start</div>
+        <div class="clocktime" id="clock">--:--</div>
+        <div class="nextup" id="nextup">Nothing queued</div>
+      </div>
+      <div class="btnrow" style="margin-top:0">
+        <button id="toggle" class="btn-primary" type="button">Start</button>
+        <button id="reset" type="button">Reset</button>
+      </div>
+    </div>
+
+    <div class="fields">
+      <div class="field">
+        <label for="serveAt">Dinner is served at</label>
+        <input type="time" id="serveAt" value="19:30" step="60">
+      </div>
+      <div class="field">
+        <label for="title">Menu name</label>
+        <input type="text" id="title" value="Sunday roast" maxlength="40" autocomplete="off">
+      </div>
+    </div>
+    <div class="hint" id="serveHint">Times count backwards from 7:30 PM.</div>
+  </section>
+
+  <!-- TASKS -->
+  <section class="card flush" aria-label="Prep list">
+    <div class="tasklist" id="tasklist"></div>
+  </section>
+
+  <!-- ADD -->
+  <section class="card">
+    <form id="addForm" autocomplete="off">
+      <div class="addgrid">
+        <div class="field">
+          <label for="newName">Component</label>
+          <input type="text" id="newName" placeholder="e.g. Rest the roast" maxlength="48">
+        </div>
+        <div class="field">
+          <label for="newMins">Minutes</label>
+          <input type="number" id="newMins" value="30" min="1" max="600" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="newOffset">Finish before</label>
+          <input type="number" id="newOffset" value="0" min="0" max="240" inputmode="numeric">
+        </div>
+        <button class="btn-primary go" type="submit">Add to prep</button>
+      </div>
+      <div class="hint">“Finish before” lets a component land early — a roast that rests 15 minutes before plating, for example.</div>
+    </form>
+  </section>
+
+  <div class="foot">
+    <span id="savedNote">Saved on this device.</span>
+    <span>Tap a circle to check a step off.</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORE_KEY = "mise-en-place-v1";
+
+  var demo = {
+    title: "Sunday roast",
+    serveAt: "19:30",
+    tasks: [
+      { id: "t1", name: "Chill the wine", mins: 5, offset: 0, done: true },
+      { id: "t2", name: "Roast the potatoes", mins: 45, offset: 0, done: false },
+      { id: "t3", name: "Rest the roast", mins: 15, offset: 0, done: false },
+      { id: "t4", name: "Make the gravy", mins: 20, offset: 0, done: false },
+      { id: "t5", name: "Blanch the greens", mins: 6, offset: 5, done: false },
+      { id: "t6", name: "Warm the plates", mins: 8, offset: 0, done: false }
+    ]
+  };
+
+  var state = {
+    title: demo.title,
+    serveAt: demo.serveAt,
+    tasks: demo.tasks.slice(),
+    running: false,
+    remaining: 0
+  };
+
+  var storageOK = true;
+
+  function load() {
+    try {
+      var raw = window.localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && Array.isArray(parsed.tasks)) {
+          state.title = typeof parsed.title === "string" ? parsed.title : demo.title;
+          state.serveAt = typeof parsed.serveAt === "string" ? parsed.serveAt : demo.serveAt;
+          state.tasks = parsed.tasks.map(function (t, i) {
+            return {
+              id: typeof t.id === "string" ? t.id : "t" + i,
+              name: typeof t.name === "string" ? t.name : "Step",
+              mins: clampNum(t.mins, 1, 600, 10),
+              offset: clampNum(t.offset, 0, 240, 0),
+              done: !!t.done
+            };
+          });
+          if (!state.tasks.length) state.tasks = demo.tasks.slice();
+          return;
+        }
+      }
+    } catch (e) {
+      storageOK = false;
+    }
+    state.tasks = demo.tasks.slice();
+  }
+
+  function save() {
+    try {
+      window.localStorage.setItem(STORE_KEY, JSON.stringify({
+        title: state.title,
+        serveAt: state.serveAt,
+        tasks: state.tasks
+      }));
+      storageOK = true;
+    } catch (e) {
+      storageOK = false;
+    }
+    document.getElementById("savedNote").textContent = storageOK
+      ? "Saved on this device."
+      : "Storage blocked — this list lasts until you close the tab.";
+  }
+
+  function clampNum(v, lo, hi, dflt) {
+    var n = parseInt(v, 10);
+    if (isNaN(n)) return dflt;
+    if (n < lo) return lo;
+    if (n > hi) return hi;
+    return n;
+  }
+
+  function uid() {
+    return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  /* ---- time helpers ---- */
+  function serveDate() {
+    var parts = (state.serveAt || "19:30").split(":");
+    var h = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10);
+    if (isNaN(h)) h = 19;
+    if (isNaN(m)) m = 30;
+    var d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d;
+  }
+
+  function startAtFor(task, serve) {
+    return new Date(serve.getTime() - (task.mins + task.offset) * 60000);
+  }
+
+  function fmtClock(d) {
+    var h = d.getHours();
+    var m = d.getMinutes();
+    var ampm = h >= 12 ? "PM" : "AM";
+    var hh = h % 12;
+    if (hh === 0) hh = 12;
+    return hh + ":" + (m < 10 ? "0" : "") + m + " " + ampm;
+  }
+
+  function fmtDur(totalSec) {
+    var s = Math.max(0, Math.round(totalSec));
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    if (h > 0) return h + "h " + (m < 10 ? "0" : "") + m + "m";
+    if (m > 0) return m + ":" + (sec < 10 ? "0" : "") + sec;
+    return sec + "s";
+  }
+
+  /* ---- rendering ---- */
+  var listEl = document.getElementById("tasklist");
+  var clockEl = document.getElementById("clock");
+  var nextEl = document.getElementById("nextup");
+  var toggleBtn = document.getElementById("toggle");
+  var serveInput = document.getElementById("serveAt");
+  var titleInput = document.getElementById("title");
+  var serveHint = document.getElementById("serveHint");
+
+  function pillClass(sec, done) {
+    if (done) return "pill done";
+    if (sec <= 0) return "pill now";
+    if (sec <= 300) return "pill soon";
+    return "pill later";
+  }
+
+  function pillText(sec, done) {
+    if (done) return "Plated";
+    if (sec <= 0) return "Start now";
+    return "in " + fmtDur(sec);
+  }
+
+  function renderList() {
+    var serve = serveDate();
+    var now = Date.now();
+
+    if (!state.tasks.length) {
+      listEl.innerHTML = '<div class="empty">No components yet. Add your first step below.</div>';
+      return;
+    }
+
+    var rows = state.tasks.map(function (task) {
+      var start = startAtFor(task, serve);
+      var sec = Math.round((start.getTime() - now) / 1000);
+      var when = fmtClock(start);
+      var sub = task.offset > 0
+        ? task.mins + " min · finishes " + task.offset + " min early"
+        : task.mins + " min";
+
+      return '' +
+        '<div class="task' + (task.done ? ' done' : '') + '" data-id="' + task.id + '">' +
+          '<button class="check" type="button" role="checkbox" aria-checked="' + (task.done ? "true" : "false") +
+            '" aria-label="Mark ' + esc(task.name) + ' complete" data-act="toggle">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>' +
+          '</button>' +
+          '<div class="tmain">' +
+            '<div class="tname">' + esc(task.name) + '</div>' +
+            '<div class="tmeta">' + esc(sub) + '</div>' +
+          '</div>' +
+          '<div class="twhen">' +
+            '<span class="' + pillClass(sec, task.done) + '">' + pillText(sec, task.done) + '</span>' +
+            '<small>Start ' + when + '</small>' +
+            '<div class="row-actions">' +
+              '<button class="mini" type="button" data-act="up" aria-label="Move up">↑</button>' +
+              '<button class="mini" type="button" data-act="down" aria-label="Move down">↓</button>' +
+              '<button class="mini danger" type="button" data-act="del" aria-label="Delete">✕</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    });
+
+    listEl.innerHTML = rows.join("");
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function nextTask() {
+    var serve = serveDate();
+    var now = Date.now();
+    var best = null;
+    state.tasks.forEach(function (t) {
+      if (t.done) return;
+      var start = startAtFor(t, serve);
+      if (!best || start < best.start) best = { task: t, start: start };
+    });
+    return best;
+  }
+
+  function renderClock() {
+    var next = nextTask();
+    if (!next) {
+      clockEl.textContent = "✓";
+      clockEl.classList.remove("done");
+      nextEl.innerHTML = state.tasks.length ? "Everything is plated. Service." : "Nothing queued";
+      toggleBtn.textContent = "Start";
+      toggleBtn.classList.add("btn-primary");
+      state.running = false;
+      state.remaining = 0;
+      return;
+    }
+    var sec = Math.round((next.start.getTime() - Date.now()) / 1000);
+    state.remaining = sec;
+    clockEl.textContent = sec > 0 ? fmtDur(sec) : "Start now";
+    clockEl.classList.toggle("done", sec <= 0);
+    nextEl.innerHTML = "Next: <b>" + esc(next.task.name) + "</b> · start " + fmtClock(next.start);
+  }
+
+  function renderAll() {
+    renderList();
+    renderClock();
+    serveHint.textContent = "Times count backwards from " + fmtClock(serveDate()) + ".";
+  }
+
+  /* ---- events ---- */
+  listEl.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    var row = btn.closest(".task");
+    if (!row) return;
+    var id = row.getAttribute("data-id");
+    var idx = -1;
+    for (var i = 0; i < state.tasks.length; i++) {
+      if (state.tasks[i].id === id) { idx = i; break; }
+    }
+    if (idx < 0) return;
+
+    var act = btn.getAttribute("data-act");
+    if (act === "toggle") {
+      state.tasks[idx].done = !state.tasks[idx].done;
+    } else if (act === "del") {
+      state.tasks.splice(idx, 1);
+    } else if (act === "up" && idx > 0) {
+      var tmp = state.tasks[idx - 1];
+      state.tasks[idx - 1] = state.tasks[idx];
+      state.tasks[idx] = tmp;
+    } else if (act === "down" && idx < state.tasks.length - 1) {
+      var tmp2 = state.tasks[idx + 1];
+      state.tasks[idx + 1] = state.tasks[idx];
+      state.tasks[idx] = tmp2;
+    }
+    save();
+    renderAll();
+  });
+
+  document.getElementById("addForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var nameEl = document.getElementById("newName");
+    var minsEl = document.getElementById("newMins");
+    var offEl = document.getElementById("newOffset");
+    var name = (nameEl.value || "").trim();
+    if (!name) {
+      nameEl.focus();
+      return;
+    }
+    state.tasks.push({
+      id: uid(),
+      name: name.slice(0, 48),
+      mins: clampNum(minsEl.value, 1, 600, 10),
+      offset: clampNum(offEl.value, 0, 240, 0),
+      done: false
+    });
+    nameEl.value = "";
+    save();
+    renderAll();
+    nameEl.focus();
+  });
+
+  serveInput.addEventListener("change", function () {
+    state.serveAt = serveInput.value || "19:30";
+    save();
+    renderAll();
+  });
+
+  titleInput.addEventListener("input", function () {
+    state.title = titleInput.value;
+    save();
+  });
+
+  toggleBtn.addEventListener("click", function () {
+    if (state.running) {
+      state.running = false;
+      toggleBtn.textContent = "Resume";
+      toggleBtn.classList.remove("btn-primary");
+      return;
+    }
+    state.running = true;
+    toggleBtn.textContent = "Pause";
+    toggleBtn.classList.remove("btn-primary");
+    tick();
+  });
+
+  document.getElementById("reset").addEventListener("click", function () {
+    state.tasks.forEach(function (t) { t.done = false; });
+    save();
+    renderAll();
+  });
+
+  var lastListPaint = 0;
+
+  function tick() {
+    renderClock();
+    var now = Date.now();
+    if (now - lastListPaint > 1000) {
+      lastListPaint = now;
+      renderList();
+    }
+    if (state.running && state.remaining <= 0) {
+      state.running = false;
+      toggleBtn.textContent = "Resume";
+      toggleBtn.classList.remove("btn-primary");
+    }
+    if (state.running) {
+      toggleBtn.textContent = "Pause";
+    }
+  }
+
+  /* ---- boot ---- */
+  load();
+  serveInput.value = state.serveAt;
+  titleInput.value = state.title;
+  renderAll();
+  save();
+  setInterval(tick, 1000);
+  tick();
+})();
+</script>
+</body>
+</html>

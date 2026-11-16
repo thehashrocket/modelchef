@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Culinary Command Center</title>
+    <meta name="description" content="A multi-tool dashboard for chefs featuring precision timers, unit conversions, and ingredient substitutions.">
+    <style>
+        :root {
+            --bg: #fdfcfb;
+            --surface: #ffffff;
+            --primary: #2d5a27;
+            --primary-light: #e8f5e9;
+            --accent: #d35400;
+            --text: #2c3e50;
+            --text-muted: #7f8c8d;
+            --border: #dee2e6;
+            --shadow: 0 4px 6px rgba(0,0,0,0.05);
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: var(--shadow);
+            z-index: 10;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        /* Tab Navigation */
+        nav {
+            display: flex;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        nav::-webkit-scrollbar { display: none; }
+
+        .tab-btn {
+            flex: 1;
+            padding: 1rem 0.5rem;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            font-size: 0.9rem;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background-color: var(--primary-light);
+        }
+
+        /* Main Content Area */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            padding-bottom: 3rem;
+        }
+
+        .view {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card Styling */
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--primary);
+        }
+
+        /* Timers View */
+        .timer-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .timer-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: #fafafa;
+        }
+
+        .timer-display {
+            font-family: monospace;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+            color: var(--text);
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+
+        .btn:active { opacity: 0.7; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-accent { background: var(--accent); color: white; }
+        .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+
+        .timer-name-input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+            outline: none;
+        }
+
+        /* Converter View */
+        .conv-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .input-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        input, select {
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 1rem;
+            width: 100%;
+        }
+
+        .conv-result {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 1rem;
+            background: var(--primary-light);
+            border-radius: var(--radius);
+            color: var(--primary);
+            margin-top: 1rem;
+        }
+
+        /* Substitutions View */
+        .search-box {
+            width: 100%;
+            margin-bottom: 1rem;
+            padding: 0.8rem;
+            border: 2px solid var(--primary-light);
+            border-radius: var(--radius);
+            font-size: 1rem;
+        }
+
+        .sub-item {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .sub-item:last-child { border-bottom: none; }
+        .sub-main { font-weight: 600; display: block; }
+        .sub-alt { font-size: 0.9rem; color: var(--text-muted); }
+
+        /* Prep List View */
+        .prep-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .prep-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .prep-item.done span {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+        .prep-input-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Utility Icons (SVG) */
+        .icon {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Culinary Command Center</h1>
+    </header>
+
+    <nav>
+        <button class="tab-btn active" onclick="showView('timers')">Timers</button>
+        <button class="tab-btn" onclick="showView('converter')">Converter</button>
+        <button class="tab-btn" onclick="showView('subs')">Substitutes</button>
+        <button class="tab-btn" onclick="showView('list')">Prep List</button>
+    </nav>
+
+    <main>
+        <!-- Timers View -->
+        <div id="timers" class="view active">
+            <div class="card">
+                <div class="card-title">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4-2.4V7z"/></svg>
+                    Active Timers
+                </div>
+                <div id="timer-container" class="timer-grid">
+                    <!-- Timers injected here -->
+                </div>
+                <button class="btn btn-primary" style="width:100%; margin-top:1rem;" onclick="addTimer()">
+                    + Add New Timer
+                </button>
+            </div>
+        </div>
+
+        <!-- Converter View -->
+        <div id="converter" class="view">
+            <div class="card">
+                <div class="card-title">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                    Unit Converter
+                </div>
+                <div class="conv-group">
+                    <div class="input-field">
+                        <label>Amount</label>
+                        <input type="number" id="conv-amount" value="1" oninput="convert()">
+                    </div>
+                    <div class="input-field">
+                        <label>From</label>
+                        <select id="conv-from" onchange="convert()">
+                            <option value="cup">Cups</option>
+                            <option value="ml">Milliliters (ml)</option>
+                            <option value="tbsp">Tablespoons</option>
+                            <option value="tsp">Teaspoons</option>
+                            <option value="oz">Fluid Ounces</option>
+                            <option value="lb">Pounds (lb)</option>
+                            <option value="g">Grams (g)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-field">
+                    <label>To</label>
+                    <select id="conv-to" onchange="convert()">
+                        <option value="ml">Milliliters (ml)</option>
+                        <option value="cup" selected>Cups</option>
+                        <option value="tbsp">Tablespoons</option>
+                        <option value="tsp">Teaspoons</option>
+                        <option value="oz">Fluid Ounces</option>
+                        <option value="lb">Pounds (lb)</option>
+                        <option value="g">Grams (g)</option>
+                    </select>
+                </div>
+                <div id="conv-result" class="conv-result">236.59 ml</div>
+            </div>
+        </div>
+
+        <!-- Substitutions View -->
+        <div id="subs" class="view">
+            <div class="card">
+                <div class="card-title">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    Ingredient Swaps
+                </div>
+                <input type="text" id="sub-search" class="search-box" placeholder="Search ingredients..." oninput="filterSubs()">
+                <div id="sub-list">
+                    <!-- Subs injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Prep List View -->
+        <div id="list" class="view">
+            <div class="card">
+                <div class="card-title">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 16H7v-2h6v2zm0-4H7v-2h6v2zm0-4H7V7h6v2z"/></svg>
+                    Prep Checklist
+                </div>
+                <div class="prep-input-row">
+                    <input type="text" id="prep-input" placeholder="Add item...">
+                    <button class="btn btn-primary" onclick="addPrepItem()">Add</button>
+                </div>
+                <div id="prep-container">
+                    <!-- Prep items injected here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- State & Data ---
+        let timers = [];
+        const substitutions = [
+            { main: "Buttermilk", alt: "1 cup milk + 1 tbsp lemon juice or vinegar" },
+            { main: "Baking Powder", alt: "1/4 tsp baking soda + 1/2 tsp cream of tartar" },
+            { main: "Brown Sugar", alt: "White sugar + small amount of molasses" },
+            { main: "Cornstarch", alt: "Arrowroot powder or flour (double amount)" },
+            { main: "Egg (for binding)", alt: "1/4 cup applesauce or mashed banana" },
+            { main: "Fresh Ginger", alt: "1/4 tsp ground ginger per 1 tbsp fresh" },
+            { main: "Heavy Cream", alt: "3/4 cup milk + 1/4 cup melted butter" },
+            { main: "Lemon Juice", alt: "Lime juice or white wine vinegar" },
+            { main: "Sour Cream", alt: "Greek yogurt" },
+            { main: "Soy Sauce", alt: "Tamari or coconut aminos" }
+        ];
+
+        const convRates = {
+            // Base unit: ml for volume, g for weight
+            // Note: simplified for common kitchen use
+            ml: 1,
+            cup: 236.588,
+            tbsp: 14.7868,
+            tsp: 4.92892,
+            oz: 29.5735,
+            g: 1,
+            lb: 453.592
+        };
+
+        // --- View Management ---
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(viewId).classList.add('active');
+            document.querySelector(`[onclick="showView('${viewId}')"]`).classList.add('active');
+        }
+
+        // --- Timers Logic ---
+        function addTimer(name = "New Timer", seconds = 300) {
+            const id = Date.now() + Math.random();
+            timers.push({
+                id,
+                name,
+                remaining: seconds,
+                total: seconds,
+                running: false,
+                interval: null
+            });
+            renderTimers();
+        }
+
+        function toggleTimer(id) {
+            const timer = timers.find(t => t.id === id);
+            if (!timer) return;
+
+            if (timer.running) {
+                clearInterval(timer.interval);
+                timer.running = false;
+            } else {
+                timer.running = true;
+                timer.interval = setInterval(() => {
+                    timer.remaining--;
+                    if (timer.remaining <= 0) {
+                        timer.remaining = 0;
+                        clearInterval(timer.interval);
+                        timer.running = false;
+                        alert(`Timer Finished: ${timer.name}`);
+                    }
+                    updateTimerDisplay(timer);
+                }, 1000);
+            }
+            renderTimers();
+        }
+
+        function resetTimer(id) {
+            const timer = timers.find(t => t.id === id);
+            if (!timer) return;
+            clearInterval(timer.interval);
+            timer.running = false;
+            timer.remaining = timer.total;
+            renderTimers();
+        }
+
+        function deleteTimer(id) {
+            const timer = timers.find(t => t.id === id);
+            if (timer && timer.interval) clearInterval(timer.interval);
+            timers = timers.filter(t => t.id !== id);
+            renderTimers();
+        }
+
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function updateTimerDisplay(timer) {
+            const el = document.getElementById(`display-${timer.id}`);
+            if (el) el.textContent = formatTime(timer.remaining);
+        }
+
+        function renderTimers() {
+            const container = document.getElementById('timer-container');
+            container.innerHTML = '';
+            
+            timers.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'timer-item';
+                div.innerHTML = `
+                    <input class="timer-name-input" value="${t.name}" onchange="updateTimerName(${t.id}, this.value)">
+                    <div class="timer-display" id="display-${t.id}">${formatTime(t.remaining)}</div>
+                    <div class="timer-controls">
+                        <button class="btn ${t.running ? 'btn-accent' : 'btn-primary'}" onclick="toggleTimer(${t.id})">
+                            ${t.running ? 'Pause' : 'Start'}
+                        </button>
+                        <button class="btn btn-outline" onclick="resetTimer(${t.id})">Reset</button>
+                        <button class="btn btn-outline" onclick="deleteTimer(${t.id})">✕</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function updateTimerName(id, val) {
+            const timer = timers.find(t => t.id === id);
+            if (timer) timer.name = val;
+        }
+
+        // --- Converter Logic ---
+        function convert() {
+            const amount = parseFloat(document.getElementById('conv-amount').value);
+            const from = document.getElementById('conv-from').value;
+            const to = document.getElementById('conv-to').value;
+            const resultEl = document.getElementById('conv-result');
+
+            if (isNaN(amount)) {
+                resultEl.textContent = "---";
+                return;
+            }
+
+            // Check if mixing weight and volume
+            const volumeUnits = ['ml', 'cup', 'tbsp', 'tsp', 'oz'];
+            const weightUnits = ['g', 'lb'];
+            const isFromVol = volumeUnits.includes(from);
+            const isToVol = volumeUnits.includes(to);
+
+            if (isFromVol !== isToVol) {
+                resultEl.textContent = "Unit mismatch (Vol vs Weight)";
+                resultEl.style.fontSize = "1rem";
+                return;
+            }
+            resultEl.style.fontSize = "1.5rem";
+
+            const baseValue = amount * convRates[from];
+            const finalValue = baseValue / convRates[to];
+            
+            resultEl.textContent = `${finalValue.toLocaleString(undefined, {maximumFractionDigits: 2})} ${to}`;
+        }
+
+        // --- Substitutions Logic ---
+        function renderSubs(filter = "") {
+            const container = document.getElementById('sub-list');
+            container.innerHTML = '';
+            
+            const filtered = substitutions.filter(s => 
+                s.main.toLowerCase().includes(filter.toLowerCase()) || 
+                s.alt.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            filtered.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'sub-item';
+                div.innerHTML = `
+                    <span class="sub-main">${s.main}</span>
+                    <span class="sub-alt">➜ ${s.alt}</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function filterSubs() {
+            const val = document.getElementById('sub-search').value;
+            renderSubs(val);
+        }
+
+        // --- Prep List Logic ---
+        let prepItems = [];
+
+        function addPrepItem() {
+            const input = document.getElementById('prep-input');
+            const val = input.value.trim();
+            if (!val) return;
+
+            prepItems.push({ id: Date.now(), text: val, done: false });
+            input.value = '';
+            savePrep();
+            renderPrep();
+        }
+
+        function togglePrep(id) {
+            const item = prepItems.find(i => i.id === id);
+            if (item) item.done = !item.done;
+            savePrep();
+            renderPrep();
+        }
+
+        function deletePrep(id) {
+            prepItems = prepItems.filter(i => i.id !== id);
+            savePrep();
+            renderPrep();
+        }
+
+        function savePrep() {
+            try {
+                localStorage.setItem('chef_prep_list', JSON.stringify(prepItems));
+            } catch (e) {
+                // Fallback to memory already handled by prepItems array
+            }
+        }
+
+        function loadPrep() {
+            try {
+                const saved = localStorage.getItem('chef_prep_list');
+                if (saved) prepItems = JSON.parse(saved);
+            } catch (e) {}
+        }
+
+        function renderPrep() {
+            const container = document.getElementById('prep-container');
+            container.innerHTML = '';
+
+            prepItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `prep-item ${item.done ? 'done' : ''}`;
+                div.innerHTML = `
+                    <input type="checkbox" ${item.done ? 'checked' : ''} onchange="togglePrep(${item.id})">
+                    <span style="flex:1">${item.text}</span>
+                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem" onclick="deletePrep(${item.id})">✕</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- Initialization ---
+        window.onload = () => {
+            // Preload Demo Content
+            addTimer("Pasta Water", 600);
+            addTimer("Steak Sear", 180);
+            
+            renderSubs();
+            
+            loadPrep();
+            if (prepItems.length === 0) {
+                prepItems = [
+                    { id: 1, text: "Mince garlic", done: true },
+                    { id: 2, text: "Dice onions", done: false },
+                    { id: 3, text: "Preheat oven to 400°F", done: false }
+                ];
+            }
+            renderPrep();
+            
+            convert();
+        };
+    </script>
+</body>
+</html>

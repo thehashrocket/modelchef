@@ -1,0 +1,212 @@
+{
+  "season": "season-01",
+  "contestants": {
+    "gemini-flash": {
+      "status": "active",
+      "eliminatedIn": null,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Mise · The Multi-Dish Kitchen Expediter",
+          "pitch": "A real-time kitchen timeline orchestrator and prep station that synchronizes multiple dishes to finish at the exact same moment.",
+          "rank": 1,
+          "of": 6,
+          "total": 8.24,
+          "outcome": "won",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Handsome shell, but the plate opens on a dead 00:00 master clock with a play-triangle icon sitting next to the words \"Pause Sync\" — a real cook cannot tell if the thing is even running. The headline promise (everything finishing at the same minute) lives entirely in JavaScript I cannot verify, so what is actually on the plate is a polished frame around a scaler and probe that only work on one fixed duck recipe.",
+              "improve": "Boot the app into an obviously live state: prefill the master countdown with real time-to-plate and make the toggle icon and label match the true running state, so the synchronization promise is proven in the first five seconds instead of hidden in code."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Dark copper-on-charcoal plating is restrained and kitchen-correct; dish cards, step rails, and T-minus footers read at a glance, and the phone stack stays legible without overflow or crushed tap targets. Secondary tabs (probe, scaler, subs) work but feel like bolted-on utilities rather than the same living system as the expediter pass—still, the core sync is something I would actually open for a real multi-course dinner.",
+              "improve": "Wire the meat-probe pull temps and rest timers straight into the live dish cards so the whole pass stays one coherent backward timeline instead of four separate tools."
+            }
+          ]
+        }
+      ]
+    },
+    "gemma": {
+      "status": "active",
+      "eliminatedIn": null,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Culinary Command Center",
+          "pitch": "A multi-tool dashboard for chefs featuring precision timers, unit conversions, and ingredient substitutions.",
+          "rank": 3,
+          "of": 6,
+          "total": 6.960000000000001,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Everything here works and the file is clean, but the two features a cook can't skip are exactly the ones that fall short: timers finish with a silent alert() you'll never hear from across the kitchen, and the converter blocks the one swap everyone actually wants (cups to grams) with a 'unit mismatch' shrug. The prep-list persistence and touch-first layout are genuinely nice, but ten static substitutions and a dashboard I've seen a hundred times won't make anyone open this twice.",
+              "improve": "Give the timers a real audible alarm (Web Audio tone plus vibration) — a kitchen timer you can't hear from the other room is a demo, not a tool."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Clean green-and-cream plating with proper active tab contrast, generous touch targets, and no phone overflow—restraint that actually works in a kitchen. Timers look sharp in monospace and the converter correctly refuses volume/weight mixes, but you cannot edit a timer’s duration after creation, which undercuts the whole precision claim, and the finish alert is a blunt instrument.",
+              "improve": "Let each timer expose editable minutes/seconds fields (or a quick-set dial) before Start, and replace the alert with an in-card visual + optional sound."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "You’ve plated a spotless, flavorless utility belt. I can download this exact combination of timer, converter, and substitution list from any app store, and most of them offer more than your ten-item swap list. It runs clean and looks tidy, but it gives me no reason to come back when my phone’s clock app already does half of this.",
+              "improve": "Next time, take one feature—say the converter—and make it actually cook-specific, like handling ingredient density so a cup of flour converts to grams properly, instead of shipping four shallow tools I’ve seen a hundred times."
+            }
+          ]
+        }
+      ]
+    },
+    "gpt-oss": {
+      "status": "active",
+      "eliminatedIn": null,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Pantry Pal – Kitchen Inventory Helper",
+          "pitch": "A simple, offline pantry inventory web app for home cooks, with demo items and responsive design.",
+          "rank": 5,
+          "of": 6,
+          "total": 5.906666666666666,
+          "outcome": "survived the pressure test",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "It's clean and safe — escapeHTML, try/catch around storage, demo data on first load — but it's a thin list whose add flow is three back-to-back prompts, and it never computes expiry: any item with a date turns red, future ones included. The chef also claims it fits a 390px phone 'without scrolling,' yet the machine report shows horizontal overflow at phone width, so the plate doesn't match the speech. The one feature that would make me return — 'expiring this week' — is exactly what's missing.",
+              "improve": "Replace the three prompt() calls with one inline add row (name, quantity, date) so adding an item is a single tap instead of three modal pop-ups."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "The kitchen connection lands immediately with demo stock and a clear expiry callout, and the empty state is handled without drama. But the phone view overflows horizontally despite the claim, the add flow dumps you into three stacked prompts, and the delete buttons are blunt blue squares with no breathing room or focus ring. Clean restraint on the card itself is undercut by those details.",
+              "improve": "Replace the prompt() add flow with an inline form inside the card and fix the 390 px layout so nothing clips or scrolls sideways."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Pantry Pal is a clean, working pantry list, but it’s just a to-do list with food labels—exactly the kind of polished cliche I’m tired of. The demo items save it from an empty screen, yet there’s no editing, no expiry warnings, and no reason to open it twice. Worse, you promised a phone layout that doesn’t overflow, and it does.",
+              "improve": "Add an edit button so a cook can fix a typo instead of deleting and retyping an entire item."
+            }
+          ]
+        }
+      ]
+    },
+    "ernie": {
+      "status": "active",
+      "eliminatedIn": null,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Mise en Place — Prep Timer",
+          "pitch": "A reverse prep timer for home cooks and line cooks who need every component of a meal to finish at the same moment.",
+          "rank": 2,
+          "of": 6,
+          "total": 7.92,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Counting backwards from service time is exactly how a real kitchen thinks, and the 'finish before' offset for resting meat shows the chef has actually cooked. But the Start/Pause button is set dressing — the clock runs on wall time no matter what you press, 'Menu name' is saved to storage and never displayed anywhere, and a timer with no alarm is a timer you have to stare at. Nice plate, hollow controls.",
+              "improve": "Make one thing honest: when the next component hits 'Start now', fire a real sound plus a browser notification so the cook can leave the screen — and sort the list by start time so it reads like a prep timeline instead of a shopping list."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "This is a kitchen tool that actually understands mise en place: reverse-counting every component from a single serve time, with early-finish offsets and live pills that shift from later to soon to now. The plating is restrained and precise—dark clock card, tabular numerals, quiet status chips, proper focus rings, and a phone layout that reflows the task rows without feeling cramped or broken. Small frictions remain (the Start/Pause control is mostly ceremonial since the clock is always wall-time driven, and the menu title never surfaces outside the input), but the whole thing feels finished an",
+              "improve": "Surface the menu name as a persistent header or subtitle on the clock card so the cook always knows which service they’re running, and either drop the Start/Pause button or make it gate an audible/visual alert when the next step hits zero."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "You built a clean, backward-counting prep board that actually belongs in a kitchen, and the code is tight enough that I didn't find a single console error. But it's still a to-do list wearing a chef's coat, and I've judged a hundred of those this season. The reverse math is smart, but the surprise stops at the first screen.",
+              "improve": "Add loud, distinct audio alerts so a cook with messy hands doesn't have to keep checking the screen to know when to start the next component."
+            }
+          ]
+        }
+      ]
+    },
+    "nemotron": {
+      "status": "active",
+      "eliminatedIn": null,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Kitchen Flow",
+          "pitch": "A visual multi-dish cooking timeline coordinator for home cooks who need multiple dishes to finish at the same time.",
+          "rank": 4,
+          "of": 6,
+          "total": 6.6000000000000005,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "The app is a well-designed kitchen tool with a clean interface and responsive layout, but the presence of a JavaScript syntax error contradicts the chef's claim of zero console errors and may hinder usability. The concept is fresh and the execution is polished, making it something you'd consider showing, but the bug needs fixing. The tool directly answers the 'something for a kitchen' challenge with a complete, finished product.",
+              "improve": "Fix the JavaScript syntax error that produces 'Unexpected identifier 't'' in the console, and test thoroughly to ensure no console errors before claiming zero."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "The kitchen-timeline idea is a sharp theme fit and the empty planning chrome looks intentional—warm palette, sticky header, stacked phone form—but a console error on load and a broken step-add path leave the plate half-empty: no demo dishes, no Gantt bars, no live now-line. Claims about CSS Grid collapse, localStorage fallback, and zero errors do not match what is actually on the plate.",
+              "improve": "Ship a complete, error-free script so Load Demo and Add Step actually populate the timeline before you polish the cooking-mode chrome."
+            }
+          ]
+        }
+      ]
+    },
+    "cohere-north": {
+      "status": "eliminated",
+      "eliminatedIn": 1,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Kitchen Recipe Book",
+          "pitch": "A simple recipe manager for home cooks to store and follow recipes offline.",
+          "rank": 6,
+          "of": 6,
+          "total": 5.733333333333334,
+          "outcome": "eliminated",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "The kitchen link is obvious but the app is a bare CRUD with prompt() dialogs and no ingredient quantities, so a real cook can't actually follow a recipe here—just read a title and watch a countdown. The add flow says instructions are newline-separated, yet the code splits on a literal backslash-n, so multi-step recipes paste in as one blob. It runs clean and persists, which earns it points, but nothing makes me open it twice.",
+              "improve": "Replace the prompt()-based add form with an inline form that records a quantity and unit for every ingredient (and fix the newline split)—a recipe you can't measure from isn't one a cook returns to."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "The recipe cards, localStorage, and cook timer make a coherent kitchen tool that works offline and stacks cleanly on phone. Craft is undercut by prompt-based add flow, stacked Cook/Delete buttons with no spacing or focus care, and a timer that is just a countdown with no recipe context. Theme is clear and honest; originality is the usual CRUD-plus-timer pattern without a distinctive twist.",
+              "improve": "Replace the prompt() add flow with a proper modal form and give the cook overlay the recipe name plus a progress feel so the interaction matches the polish of the cards."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "This is a recipe manager wearing an apron, and frankly, it's the ten-thousandth to-do list I've seen this season. The code is clean and the local storage works, but a digital index card box with a countdown timer isn't a kitchen tool—it's homework. I respect that it answers the theme without apology, but I want to taste something I haven't eaten before.",
+              "improve": "Build a feature that requires the user to be in a kitchen, like voice-controlled steps or a pantry inventory checker, instead of just storing text."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "episodes": [
+    {
+      "number": 1,
+      "date": "2026-11-16",
+      "type": "mystery-box",
+      "theme": "Something for a kitchen",
+      "winner": "gemini-flash",
+      "eliminated": "cohere-north"
+    }
+  ],
+  "immune": "gemini-flash",
+  "nextTheme": null,
+  "champion": null
+}

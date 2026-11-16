@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Markdown Split Previewer</title>
+<meta name="description" content="A live markdown previewer with split pane, headings, lists, emphasis, links, code blocks, and word count for quick editing.">
+<style>
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html,
+body {
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+}
+.container {
+  max-width: 100%;
+  padding: 1rem;
+}
+h1 {
+  margin-bottom: 1rem;
+}
+.split-container {
+  display: flex;
+  flex-direction: row;
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+.pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  overflow: auto;
+}
+.input-pane {
+  background: #f9f9f9;
+  border-right: 1px solid #ddd;
+}
+.preview-pane {
+  background: #fff;
+}
+textarea {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  font-family: Menlo, Consolas, Monaco, monospace;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.preview {
+  flex: 1;
+  overflow-wrap: break-word;
+  line-height: 1.6;
+}
+.word-count {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+h1, h2, h3, h4, h5, h6 {
+  margin: 0.5rem 0;
+}
+ul {
+  margin-left: 1.5rem;
+}
+pre {
+  background: #f5f5f5;
+  padding: 0.5rem;
+  border-radius: 4px;
+  overflow: auto;
+}
+a {
+  color: #0066cc;
+}
+@media (max-width: 600px) {
+  .split-container {
+    flex-direction: column;
+    height: auto;
+  }
+  .pane {
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Markdown Previewer</h1>
+  <div class="split-container">
+    <div class="pane input-pane">
+      <textarea id="markdown-input" placeholder="Type markdown here..."></textarea>
+    </div>
+    <div class="pane preview-pane">
+      <div id="preview" class="preview"></div>
+      <div class="word-count">Words: <span id="word-count">0</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Demo markdown content
+const DEMO_MARKDOWN = `# Heading 1
+## Heading 2
+- Item one
+- Item two
+  - Nested item
+**Bold text** and *italic text*.
+[Link text](https://example.com)
+\`inline code\`
+\`\`\`
+code block
+multiple lines
+\`\`\`
+`;
+
+// Storage key
+const STORAGE_KEY = 'markdown-previewer';
+
+// Helper to safely access storage
+function loadFromStorage() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveToStorage(value) {
+  try {
+    localStorage.setItem(STORAGE_KEY, value);
+  } catch (e) {}
+}
+
+// Inline formatting helper (emphasis, links, inline code)
+function formatInline(text) {
+  // Links
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  // Bold
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  // Inline code
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return text;
+}
+
+// Convert markdown to HTML (basic parser)
+function markdownToHtml(md) {
+  // 1. Code blocks (triple backticks)
+  let html = md.replace(/(`{3,})([^\n]*)\n([\s\S]*?)\n\1/g, (m, ticks, lang, code) => {
+    // Escape HTML inside code
+    code = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return '<pre><code>' + code + '</code></pre>';
+  });
+
+  // 2. Process line by line for headings, lists, paragraphs
+  const lines = html.split('\n');
+  let out = '';
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // If line already contains a code block tag (from step 1), keep as is
+    if (line.includes('<pre>')) {
+      out += line + '\n';
+      continue;
+    }
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,6})\s*(.*)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const text = headingMatch[2];
+      out += `<h${level}>${formatInline(text)}</h${level}>\n`;
+      continue;
+    }
+
+    // List items (lines starting with -, *, +)
+    if (/^[-*+]\s/.test(line)) {
+      const text = line.replace(/^[-*+]\s/, '');
+      out += `<li>${formatInline(text)}</li>\n`;
+      continue;
+    }
+
+    // Blank lines
+    if (line.trim() === '') {
+      out += '\n';
+      continue;
+    }
+
+    // Paragraph
+    out += `<p>${formatInline(line)}</p>\n`;
+  }
+
+  // Wrap list items in <ul> (simple approach)
+  out = out.replace(/<li>/g, '<ul><li>');
+  out = out.replace(/<\/li>/g, '</li></ul>');
+
+  return out;
+}
+
+// DOM references
+const textarea = document.getElementById('markdown-input');
+const preview = document.getElementById('preview');
+const wordCountSpan = document.getElementById('word-count');
+
+// Update preview and word count
+function updatePreviewAndCount() {
+  const md = textarea.value;
+  preview.innerHTML = markdownToHtml(md);
+  // Word count from rendered text (plain text)
+  const plainText = preview.textContent || '';
+  const words = plainText.trim() ? plainText.trim().split(/\s+/).length : 0;
+  wordCountSpan.textContent = words;
+}
+
+// Load initial content
+let initialMarkdown = loadFromStorage();
+if (!initialMarkdown) {
+  initialMarkdown = DEMO_MARKDOWN;
+  saveToStorage(initialMarkdown);
+}
+textarea.value = initialMarkdown;
+updatePreviewAndCount();
+
+// Persist and live update
+textarea.addEventListener('input', () => {
+  saveToStorage(textarea.value);
+  updatePreviewAndCount();
+});
+</script>
+</body>
+</html>

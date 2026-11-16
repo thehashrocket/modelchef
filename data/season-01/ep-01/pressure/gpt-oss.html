@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Markdown Split‑Pane Previewer</title>
+<meta name="description" content="A live markdown previewer with split pane, word count and mobile‑friendly layout for anyone who writes markdown.">
+<style>
+html,body{margin:0;padding:0;height:100%;font-family:system-ui,sans-serif;background:#fafafa;color:#222;}
+#app{display:flex;flex-direction:row;height:100%;overflow:hidden;}
+#editor,#preview{flex:1;box-sizing:border-box;padding:1rem;overflow:auto;}
+#editor{border-right:1px solid #ddd;background:#fff;}
+textarea{width:100%;height:100%;box-sizing:border-box;border:none;resize:none;font:inherit;background:transparent;color:inherit;}
+#wordCount{position:fixed;bottom:0;right:0;background:#fff;border-top-left-radius:4px;padding:0.3rem 0.6rem;font-size:0.9rem;border:1px solid #ccc;}
+pre{background:#f0f0f0;padding:0.5rem;overflow:auto;}
+code{font-family:monospace;}
+a{color:#0066cc;}
+@media (max-width:600px){
+  #app{flex-direction:column;}
+  #editor{border-right:none;border-bottom:1px solid #ddd;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="editor">
+    <textarea id="mdInput"></textarea>
+  </div>
+  <div id="preview"></div>
+</div>
+<div id="wordCount"></div>
+<script>
+(() => {
+  const demo = `# Welcome to the Markdown Previewer
+
+## Features
+
+- Live rendering of **headings**, *emphasis*, and \`code\`.
+- Unordered lists with **bold** and *italic* text.
+- [Links](https://example.com) open in a new tab.
+- Fenced code blocks:
+
+\`\`\`
+function hello() {
+  console.log("Hello, world!");
+}
+\`\`\`
+
+Enjoy writing markdown!
+
+`;
+
+  const textarea = document.getElementById('mdInput');
+  const preview = document.getElementById('preview');
+  const wcDiv = document.getElementById('wordCount');
+
+  // Load demo content
+  textarea.value = demo;
+  render();
+
+  // Attach listeners
+  textarea.addEventListener('input', render);
+
+  function render() {
+    const raw = textarea.value;
+    preview.innerHTML = parseMarkdown(raw);
+    wcDiv.textContent = 'Words: ' + countWords(raw);
+  }
+
+  function countWords(str) {
+    return str.trim().split(/\s+/).filter(w => w).length;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;')
+              .replace(/</g,'&lt;')
+              .replace(/>/g,'&gt;');
+  }
+
+  function parseMarkdown(md) {
+    // Escape HTML first
+    let html = escapeHtml(md);
+
+    // Code blocks (fenced)
+    html = html.replace(/```([\s\S]*?)```/g, (m, p1) => {
+      const code = escapeHtml(p1);
+      return `<pre><code>${code}</code></pre>`;
+    });
+
+    const lines = html.split('\n');
+    let result = '';
+    let inList = false;
+
+    for (let line of lines) {
+      // Headings
+      if (/^######\s+(.*)/.test(line)) { result += line.replace(/^######\s+(.*)/, '<h6>$1</h6>'); continue; }
+      if (/^#####\s+(.*)/.test(line)) { result += line.replace(/^#####\s+(.*)/, '<h5>$1</h5>'); continue; }
+      if (/^####\s+(.*)/.test(line)) { result += line.replace(/^####\s+(.*)/, '<h4>$1</h4>'); continue; }
+      if (/^###\s+(.*)/.test(line)) { result += line.replace(/^###\s+(.*)/, '<h3>$1</h3>'); continue; }
+      if (/^##\s+(.*)/.test(line)) { result += line.replace(/^##\s+(.*)/, '<h2>$1</h2>'); continue; }
+      if (/^#\s+(.*)/.test(line)) { result += line.replace(/^#\s+(.*)/, '<h1>$1</h1>'); continue; }
+
+      // List items
+      const liMatch = line.match(/^(\s*)[-*+]\s+(.*)/);
+      if (liMatch) {
+        const content = liMatch[2];
+        if (!inList) { inList = true; result += '<ul>'; }
+        result += `<li>${processInline(content)}</li>`;
+        continue;
+      } else {
+        if (inList) { inList = false; result += '</ul>'; }
+      }
+
+      // Empty line => paragraph break
+      if (line.trim() === '') {
+        result += '';
+        continue;
+      }
+
+      // Paragraph
+      result += `<p>${processInline(line)}</p>`;
+    }
+
+    if (inList) result += '</ul>';
+    return result;
+  }
+
+  function processInline(text) {
+    let out = text;
+    // Bold **text**
+    out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Italic *text*
+    out = out.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Inline code `code`
+    out = out.replace(/`([^`]+?)`/g, '<code>$1</code>');
+    // Links [text](url)
+    out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    return out;
+  }
+
+  // Optional: attempt to persist content (fails silently if storage unavailable)
+  try {
+    const saved = localStorage.getItem('md-demo');
+    if (saved) textarea.value = saved;
+    textarea.addEventListener('input', () => {
+      localStorage.setItem('md-demo', textarea.value);
+    });
+  } catch (e) { /* ignore storage errors */ }
+
+})();
+</script>
+</body>
+</html>

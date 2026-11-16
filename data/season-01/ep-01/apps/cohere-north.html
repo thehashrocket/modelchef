@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kitchen Recipe Book</title>
+<meta name="description" content="A simple recipe manager for home cooks to store and follow recipes offline.">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;background:#fafafa;color:#333;padding:20px}
+.container{max-width:600px;margin:0 auto}
+h1{text-align:center;margin-bottom:20px}
+#addBtn{display:block;margin:0 auto 20px;padding:10px 20px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer}
+.recipe-grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.recipe-card{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);padding:15px;display:flex;flex-direction:column;gap:10px}
+.recipe-card h2{font-size:1.2rem;margin:0}
+.recipe-card h3{font-size:1rem;margin:0 0 5px}
+.recipe-card ul,.recipe-card ol{padding-left:1.2rem;margin:0}
+.cook-btn,.delete-btn{padding:8px 12px;border:none;border-radius:4px;cursor:pointer;align-self:flex-start;margin-top:auto}
+.cook-btn{background:#2196F3;color:#fff}
+.delete-btn{background:#f44336;color:#fff}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:1000}
+.overlay-content{background:#fff;padding:20px;border-radius:8px;text-align:center;max-width:90%}
+#timerDisplay{font-size:2rem;margin:15px 0}
+#closeOverlay{margin-top:15px;padding:8px 16px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer}
+@media(max-width:480px){.recipe-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Kitchen Recipe Book</h1>
+<button id="addBtn">Add Recipe</button>
+<div id="recipeList" class="recipe-grid"></div>
+</div>
+
+<div id="overlay" class="overlay" style="display:none;">
+<div class="overlay-content">
+<h2>Cooking in progress...</h2>
+<div id="timerDisplay">0s</div>
+<button id="closeOverlay">Cancel</button>
+</div>
+</div>
+
+<script>
+let recipes = [];
+
+function loadRecipes() {
+  try {
+    const data = localStorage.getItem('kitchenRecipes');
+    if (data) {
+      recipes = JSON.parse(data);
+    }
+  } catch (e) {
+    console.error('Failed to load recipes', e);
+    recipes = [];
+  }
+}
+
+function saveRecipes() {
+  try {
+    localStorage.setItem('kitchenRecipes', JSON.stringify(recipes));
+  } catch (e) {
+    console.error('Failed to save recipes', e);
+  }
+}
+
+function renderRecipes() {
+  const list = document.getElementById('recipeList');
+  if (!list) return;
+  list.innerHTML = '';
+  recipes.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'recipe-card';
+    card.innerHTML = `
+      <h2>${r.title}</h2>
+      <div><strong>Cook time:</strong> ${r.cookTime}s</div>
+      <div><h3>Ingredients</h3><ul>${r.ingredients.map(i => `<li>${i}</li>`).join('')}</ul></div>
+      <div><h3>Instructions</h3><ol>${r.instructions.map(step => `<li>${step}</li>`).join('')}</ol></div>
+      <button class="cook-btn" data-id="${r.id}">Cook</button>
+      <button class="delete-btn" data-id="${r.id}">Delete</button>
+    `;
+    list.appendChild(card);
+  });
+  attachListeners();
+}
+
+function attachListeners() {
+  document.querySelectorAll('.cook-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const id = Number(e.currentTarget.getAttribute('data-id'));
+      const recipe = recipes.find(r => r.id === id);
+      if (!recipe) return;
+      showCookingOverlay(recipe);
+    });
+  });
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const id = Number(e.currentTarget.getAttribute('data-id'));
+      recipes = recipes.filter(r => r.id !== id);
+      saveRecipes();
+      renderRecipes();
+    });
+  });
+}
+
+function showCookingOverlay(recipe) {
+  const overlay = document.getElementById('overlay');
+  const timerDisplay = document.getElementById('timerDisplay');
+  const closeBtn = document.getElementById('closeOverlay');
+  if (!overlay || !timerDisplay) return;
+  overlay.style.display = 'flex';
+  let remaining = recipe.cookTime;
+  timerDisplay.textContent = `${remaining}s`;
+  let interval = null;
+  const startTimer = () => {
+    interval = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(interval);
+        interval = null;
+        timerDisplay.textContent = 'Ready!';
+        setTimeout(() => {
+          overlay.style.display = 'none';
+        }, 1000);
+      } else {
+        timerDisplay.textContent = `${remaining}s`;
+      }
+    }, 1000);
+  };
+  startTimer();
+  const hideOverlay = () => {
+    overlay.style.display = 'none';
+    if (interval) clearInterval(interval);
+  };
+  closeBtn.addEventListener('click', hideOverlay);
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) hideOverlay();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadRecipes();
+  if (recipes.length === 0) {
+    recipes = [
+      {
+        id: 1,
+        title: 'Simple Pancakes',
+        ingredients: ['Flour','Eggs','Milk','Baking powder','Salt'],
+        instructions: [
+          'Mix dry ingredients in a bowl.',
+          'Add wet ingredients and stir.',
+          'Cook on a skillet until bubbles form.',
+          'Flip and cook until golden brown.'
+        ],
+        cookTime: 120
+      },
+      {
+        id: 2,
+        title: 'Tomato Soup',
+        ingredients: ['Tomatoes','Onion','Garlic','Olive oil','Salt','Pepper'],
+        instructions: [
+          'Sauté onion and garlic in olive oil.',
+          'Add chopped tomatoes and simmer.',
+          'Season with salt and pepper.',
+          'Blend until smooth (optional).'
+        ],
+        cookTime: 180
+      },
+      {
+        id: 3,
+        title: 'Avocado Toast',
+        ingredients: ['Bread','Avocado','Lemon','Salt','Pepper'],
+        instructions: [
+          'Toast bread to desired crispness.',
+          'Mash avocado with lemon, salt, pepper.',
+          'Spread on toast.',
+          'Serve immediately.'
+        ],
+        cookTime: 60
+      }
+    ];
+    saveRecipes();
+  }
+  renderRecipes();
+
+  const addBtn = document.getElementById('addBtn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      const title = prompt('Recipe title:');
+      if (!title) return;
+      const ingStr = prompt('Ingredients (comma separated):');
+      const ingredients = ingStr ? ingStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const instrStr = prompt('Instructions (separate by newline):');
+      const instructions = instrStr ? instrStr.split('\\n').map(s => s.trim()).filter(Boolean) : [];
+      const cookTime = parseInt(prompt('Cook time in seconds (default 60):') || '60');
+      const newRecipe = {
+        id: recipes.length ? Math.max(...recipes.map(r => r.id)) + 1 : 1,
+        title,
+        ingredients,
+        instructions,
+        cookTime
+      };
+      recipes.push(newRecipe);
+      saveRecipes();
+      renderRecipes();
+    });
+  }
+});
+</script>
+</body>
+</html>

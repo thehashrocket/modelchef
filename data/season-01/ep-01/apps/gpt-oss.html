@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pantry Pal – Kitchen Inventory Helper</title>
+<meta name="description" content="A simple, offline pantry inventory web app for home cooks, with demo items and responsive design.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;padding:0;background:#f8f9fa;color:#212529;display:flex;flex-direction:column;align-items:center;}
+  h1{margin:1rem 0 0.5rem;font-size:1.5rem;}
+  #app{width:100%;max-width:380px;background:#fff;padding:1rem;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+  .item{display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid #e0e0e0;}
+  .item:last-child{border-bottom:none;}
+  .name{font-weight:500;}
+  .qty{font-size:0.9rem;color:#555;}
+  .expire{font-size:0.8rem;color:#d9534f;}
+  button{background:#007bff;color:#fff;border:none;border-radius:4px;padding:0.4rem 0.8rem;margin:0.2rem;cursor:pointer;}
+  button:hover{background:#0056b3;}
+  #controls{display:flex;justify-content:space-between;margin-top:0.8rem;}
+  input[type=text]{flex:1;margin-right:0.4rem;padding:0.3rem;border:1px solid #ccc;border-radius:4px;}
+  @media (max-width:400px){
+    #app{padding:0.8rem;}
+    h1{font-size:1.3rem;}
+  }
+</style>
+</head>
+<body>
+<h1>Pantry Pal</h1>
+<div id="app">
+  <div id="list"></div>
+  <div id="controls">
+    <button id="addBtn">Add Item</button>
+    <button id="clearBtn">Clear All</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'pantryPalData';
+  let data = [];
+
+  const demoData = [
+    {name:'Spaghetti', qty:'1 kg', expire:''},
+    {name:'Olive Oil', qty:'500 ml', expire:''},
+    {name:'Canned Tomatoes', qty:'3 x 400 g', expire:'2025-04-12'},
+    {name:'Flour', qty:'2 kg', expire:''},
+    {name:'Baking Soda', qty:'200 g', expire:''}
+  ];
+
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        data = JSON.parse(raw);
+        if (!Array.isArray(data)) data = [];
+      } else {
+        data = demoData.slice();
+        saveData();
+      }
+    } catch (e) {
+      // storage unavailable or corrupted
+      data = demoData.slice();
+    }
+  }
+
+  function saveData() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      // ignore storage errors
+    }
+  }
+
+  function render() {
+    const list = document.getElementById('list');
+    list.innerHTML = '';
+    if (data.length===0){
+      list.innerHTML = '<p style="color:#777;text-align:center;">Your pantry is empty.</p>';
+      return;
+    }
+    data.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      const left = document.createElement('div');
+      left.innerHTML = `<span class="name">${escapeHTML(item.name)}</span><br><span class="qty">${escapeHTML(item.qty)}</span>`;
+      if (item.expire) {
+        const exp = document.createElement('div');
+        exp.className = 'expire';
+        exp.textContent = 'Expires: '+item.expire;
+        left.appendChild(exp);
+      }
+      const right = document.createElement('div');
+      const del = document.createElement('button');
+      del.textContent = '✕';
+      del.title = 'Delete';
+      del.onclick = () => { data.splice(idx,1); saveData(); render(); };
+      right.appendChild(del);
+      div.appendChild(left);
+      div.appendChild(right);
+      list.appendChild(div);
+    });
+  }
+
+  function escapeHTML(str){
+    return String(str).replace(/[&<>"']/g, m=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[m]);
+  }
+
+  document.getElementById('addBtn').onclick = () => {
+    const name = prompt('Item name:');
+    if (!name) return;
+    const qty = prompt('Quantity (e.g., 500 g, 2 pcs):')||'';
+    const expire = prompt('Expiration date (YYYY-MM-DD) – leave blank if none:')||'';
+    data.push({name, qty, expire});
+    saveData();
+    render();
+  };
+
+  document.getElementById('clearBtn').onclick = () => {
+    if (confirm('Delete all items?')) {
+      data = [];
+      saveData();
+      render();
+    }
+  };
+
+  loadData();
+  render();
+})();
+</script>
+</body>
+</html>

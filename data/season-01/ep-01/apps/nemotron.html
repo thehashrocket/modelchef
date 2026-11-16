@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kitchen Flow</title>
+  <meta name="description" content="A visual multi-dish cooking timeline coordinator for home cooks who need multiple dishes to finish at the same time.">
+  <style>
+    :root {
+      --bg: #faf8f5;
+      --fg: #2d2a26;
+      --muted: #6b6660;
+      --accent: #c85c2e;
+      --accent-soft: #f5e6dc;
+      --card: #ffffff;
+      --border: #e8e2db;
+      --danger: #b84a3a;
+      --success: #4a7c59;
+      --shadow: 0 2px 8px rgba(45,42,38,0.08);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1816;
+        --fg: #f0ebe7;
+        --muted: #9a948d;
+        --accent: #e87d4a;
+        --accent-soft: #3d2e24;
+        --card: #24211e;
+        --border: #3a3530;
+        --shadow: 0 2px 12px rgba(0,0,0,0.35);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 1rem;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: var(--shadow);
+    }
+    .header-inner {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .logo { font-size: 1.5rem; line-height: 1; }
+    .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    main { flex: 1; padding: 1rem; max-width: 1000px; margin: 0 auto; width: 100%; }
+    .section { margin-bottom: 1.5rem; }
+    .section-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    .btn {
+      appearance: none;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.625rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.08s ease, background 0.15s ease, opacity 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-secondary { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-ghost { background: transparent; color: var(--fg); }
+    .btn-ghost:hover { background: var(--accent-soft); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-sm { padding: 0.375rem 0.625rem; font-size: 0.75rem; }
+    /* Form */
+    .dish-form {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      box-shadow: var(--shadow);
+    }
+    .form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; align-items: flex-end; }
+    .form-group { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 0.25rem; }
+    .form-group label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+    .form-group input, .form-group select {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .steps-list { border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.5rem; }
+    .step-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.5rem; }
+    .step-row .form-group { flex: 1; min-width: 0; }
+    .step-row .form-group.small { min-width: 80px; }
+    .step-row .form-group.med { min-width: 140px; }
+    .drag-handle { cursor: grab; padding: 0.5rem; color: var(--muted); touch-action: none; }
+    .drag-handle:active { cursor: grabbing; }
+    .step-row.dragging { opacity: 0.5; background: var(--accent-soft); }
+    /* Timeline */
+    .timeline-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .timeline { display: grid; grid-template-columns: 140px 1fr; gap: 0.5rem; min-width: 600px; }
+    .timeline-header { display: contents; }
+    .timeline-col-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 0.5rem 0.75rem; }
+    .timeline-col-time { display: contents; }
+    .time-markers { display: grid; grid-template-columns: repeat(24, 1fr); gap: 0.5rem; padding: 0.5rem 0; }
+    .time-marker { text-align: center; font-size: 0.65rem; color: var(--muted); position: relative; }
+    .time-marker::before { content: ''; position: absolute; top: 1.25rem; left: 50%; height: 100vh; border-left: 1px dashed var(--border); z-index: -1; }
+    .time-marker.major { font-weight: 600; color: var(--fg); }
+    .time-marker.major::before { border-left-color: var(--accent); }
+    .dish-row { display: contents; }
+    .dish-label {
+      padding: 0.5rem 0.75rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      min-height: 48px;
+    }
+    .dish-label .dish-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dish-label .dish-total { font-size: 0.7rem; color: var(--muted); font-weight: 400; }
+    .dish-track { display: grid; grid-template-columns: repeat(24, 1fr); gap: 0.5rem; padding: 0.25rem 0; align-items: start; }
+    .step-block {
+      border-radius: var(--radius-sm);
+      padding: 0.375rem 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 36px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.15s ease;
+    }
+    .step-block:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(45,42,38,0.15); }
+    .step-block .step-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .step-block .step-duration { font-size: 0.6rem; opacity: 0.9; font-weight: 400; }
+    .step-block.active { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(200,92,46,0.4); } 50% { box-shadow: 0 0 0 6px rgba(200,92,46,0); } }
+    .now-line {
+      position: fixed;
+      top: 0; bottom: 0;
+      width: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      z-index: 5;
+      pointer-events: none;
+      display: none;
+    }
+    .now-line.visible { display: block; }
+    .now-line::after {
+      content: 'NOW';
+      position: absolute;
+      top: 60px;
+      left: -20px;
+      background: var(--accent);
+      color: white;
+      padding: 0.125rem 0.375rem;
+      border-radius: 4px;
+      font-size: 0.55rem;
+      font-weight: 700;
+      white-space: nowrap;
+      transform: rotate(-90deg);
+      transform-origin: left bottom;
+    }
+    /* Active Cooking View */
+    .active-view { display: none; }
+    .active-view.visible { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .active-header {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .active-header.top-bar { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .countdown { font-size: 3rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; color: var(--accent); font-family: 'SF Mono', 'Monaco', monospace; }
+    .current-step {
+      background: var(--accent-soft);
+      border: 2px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .current-step-info { flex: 1; min-width: 150px; }
+    .current-step-name { font-size: 1.125rem; font-weight: 700; }
+    .current-step-meta { font-size: 0.8rem; color: var(--muted); display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.25rem; }
+    .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; flex: 1; min-width: 100px; max-width: 200px; }
+    .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.5s ease; }
+    .upcoming-steps { display: flex; flex-direction: column; gap: 0.5rem; }
+    .upcoming-step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transition: border-color 0.15s ease;
+    }
+    .upcoming-step.next { border-color: var(--accent); }
+    .upcoming-step.done { opacity: 0.5; border-color: var(--success); }
+    .upcoming-step .step-color { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+    .upcoming-step .step-details { flex: 1; min-width: 0; }
+    .upcoming-step .step-name { font-weight: 600; font-size: 0.875rem; }
+    .upcoming-step .step-meta { font-size: 0.75rem; color: var(--muted); display: flex; gap: 0.75rem; margin-top: 0.125rem; }
+    .upcoming-step .step-time { font-variant-numeric: tabular-nums; font-family: 'SF Mono', 'Monaco', monospace; }
+    .controls { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; margin-top: 1rem; }
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+    }
+    .empty-state svg { width: 64px; height: 64px; margin-bottom: 1rem; opacity: 0.5; }
+    .empty-state p { font-size: 0.9375rem; margin-bottom: 1rem; }
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 100;
+      animation: fadeIn 0.15s ease;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+    .modal h3 { font-size: 1rem; margin-bottom: 1rem; }
+    .modal .form-group { margin-bottom: 0.75rem; }
+    .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--fg);
+      color: var(--bg);
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-weight: 500;
+      box-shadow: var(--shadow);
+      z-index: 200;
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+    /* Mobile adjustments */
+    @media (max-width: 599px) {
+      .timeline { grid-template-columns: 100px 1fr; min-width: 500px; }
+      .dish-label { font-size: 0.75rem; padding: 0.375rem 0.5rem; }
+      .step-block { font-size: 0.65rem; padding: 0.25rem 0.375rem; min-height: 32px; }
+      .countdown { font-size: 2.25rem; }
+      .current-step-name { font-size: 1rem; }
+      header { padding: 0.75rem; }
+      main { padding: 0.75rem; }
+    }
+    @media (max-width: 390px) {
+      .form-row { flex-direction: column; align-items: stretch; }
+      .form-group { min-width: 0; }
+      .step-row { flex-direction: column; align-items: stretch; }
+      .step-row .form-group { min-width: 0; }
+      .drag-handle { display: none; }
+      .btn { width: 100%; justify-content: center; }
+      .header-actions { width: 100%; }
+      .header-actions .btn { flex: 1; }
+      .modal-actions .btn { flex: 1; }
+    }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1><span class="logo" aria-hidden="true">🍳</span> Kitchen Flow</h1>
+      <div class="header-actions">
+        <button class="btn btn-secondary" id="btnLoadDemo" aria-label="Load Thanksgiving demo">Load Demo</button>
+        <button class="btn btn-primary" id="btnStartCooking" aria-label="Start cooking mode">Start Cooking</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Planning View -->
+    <section id="planningView" class="section" aria-labelledby="planningTitle">
+      <h2 id="planningTitle" class="section-title">Plan Your Meal</h2>
+      
+      <form class="dish-form" id="dishForm" novalidate>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="dishName">Dish Name</label>
+            <input type="text" id="dishName" placeholder="e.g., Roast Turkey" required maxlength="40">
+          </div>
+          <div class="form-group" style="min-width: 100px;">
+            <label for="dishColor">Color</label>
+            <select id="dishColor">
+              <option value="#c85c2e">🟠 Terracotta</option>
+              <option value="#4a7c59">🟢 Sage</option>
+              <option value="#2a6b8a">🔵 Slate</option>
+              <option value="#b84a3a">🔴 Brick</option>
+              <option value="#8b6f3a">🟡 Mustard</option>
+              <option value="#6b4a8a">🟣 Plum</option>
+            </select>
+          </div>
+        </div>
+        <div class="steps-list" id="stepsList" role="list" aria-label="Cooking steps">
+          <!-- Steps added dynamically -->
+        </div>
+        <div class="form-row">
+          <button type="button" class="btn btn-secondary" id="btnAddStep" style="flex: 1;">+ Add Step</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Add Dish</button>
+        </div>
+      </form>
+
+      <div class="timeline-wrap" id="timelineWrap" role="region" aria-label="Cooking timeline" tabindex="0">
+        <div class="timeline" id="timeline">
+          <div class="timeline-header">
+            <div class="timeline-col-label">Dish</div>
+            <div class="timeline-col-time">Timeline (24h)</div>
+          </div>
+          <div class="timeline-header">
+            <div class="timeline-col-label"></div>
+            <div class="time-markers" id="timeMarkers" aria-hidden="true"></div>
+          </div>
+          <!-- Dish rows inserted here -->
+        </div>
+      </div>
+
+      <div class="empty-state" id="emptyState" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <p>No dishes yet. Add your first dish above or load the Thanksgiving demo.</p>
+        <button class="btn btn-primary" id="btnLoadDemo2">Load Thanksgiving Demo</button>
+      </div>
+    </section>
+
+    <!-- Active Cooking View -->
+    <section id="activeView" class="section active-view" aria-labelledby="activeTitle" hidden>
+      <h2 id="activeTitle" class="visually-hidden">Active Cooking</h2>
+      
+      <div class="active-header top-bar">
+        <div style="flex: 1; min-width: 150px;">
+          <div style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--muted); margin-bottom: 0.25rem;">Elapsed</div>
+          <div class="countdown" id="elapsedTime" role="timer" aria-live="polite">00:00:00</div>
+        </div>
+        <button class="btn btn-danger" id="btnStopCooking" style="align-self: flex-end;">Stop Cooking</button>
+      </div>
+
+      <div class="active-header">
+        <div class="countdown" id="stepCountdown" role="timer" aria-live="assertive" aria-atomic="true">--:--</div>
+        <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Step progress">
+          <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="current-step" id="currentStepCard" aria-live="polite">
+        <div class="current-step-info">
+          <div class="current-step-name" id="currentStepName">Press "Start Cooking" to begin</div>
+          <div class="current-step-meta" id="currentStepMeta"></div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button class="btn btn-primary" id="btnCompleteStep" disabled>Complete Step</button>
+          <button class="btn btn-secondary" id="btnSkipStep" disabled>Skip</button>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top: 1.5rem;">Upcoming Steps</div>
+      <div class="upcoming-steps" id="upcomingSteps" role="list" aria-label="Upcoming cooking steps"></div>
+
+      <div class="controls">
+        <button class="btn btn-secondary" id="btnResetTimer">Reset Timer</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Add Step Modal -->
+  <div class="modal-overlay" id="stepModal" role="dialog" aria-modal="true" aria-labelledby="stepModalTitle">
+    <div class="modal">
+      <h3 id="stepModalTitle">Add Cooking Step</h3>
+      <form id="stepForm" novalidate>
+        <div class="form-group">
+          <label for="stepName">Step Name</label>
+          <input type="text" id="stepName" placeholder="e.g., Roast at 350°F" required maxlength="40">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="stepDuration">Duration (min)</label>
+            <input type="number" id="stepDuration" min="1" max="480" value="30" required>
+          </div>
+          <div class="form-group">
+            <label for="stepTemp">Temp (°F, optional)</label>
+            <input type="number" id="stepTemp" min="0" max="600" placeholder="350">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="stepNotes">Notes (optional)</label>
+          <input type="text" id="stepNotes" placeholder="e.g., Baste every 30 min" maxlength="60">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelStep">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Step</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Dish Modal -->
+  <div class="modal-overlay" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div class="modal">
+      <h3 id="deleteModalTitle">Delete Dish?</h3>
+      <p style="margin-bottom: 1rem; color: var(--muted);">This will remove <strong id="deleteDishName"></strong> and all its steps.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCancelDelete">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btnConfirmDelete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="now-line" id="nowLine" aria-hidden="true"></div>
+
+  <script>
+    // ===== State Management =====
+    const STORAGE_KEY = 'kitchenFlow_v1';
+    let dishes = [];
+    let editingDishId = null;
+    let stepEditIndex = -1;
+    
+    // Cooking mode state
+    let cookingMode = false;
+    let cookStartTime = 0;
+    let cookPausedTime = 0;
+    let currentStepIndex = 0;
+    let stepStartTime = 0;
+    let stepDuration = 0;
+    let timerInterval = null;
+    let allStepsFlat = []; // [{dishId, dishName, dishColor, stepIndex, step, absoluteStart, absoluteEnd}]
+    let nowLineUpdateInterval = null;
+
+    // ===== Storage =====
+    const storage = {
+      get: () => {
+        try {
+          const data = localStorage.getItem(STORAGE_KEY);
+          return data ? JSON.parse(data) : null;
+        } catch { return null; }
+      },
+      set: (data) => {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+      }
+    };
+
+    // ===== Utilities =====
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    const fmtTime = (ms) => {
+      if (ms < 0) ms = 0;
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    };
+    const fmtMin = (min) => {
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    };
+    const minutesToMs = (min) => min * 60000;
+    const msToMinutes = (ms) => Math.round(ms / 60000);
+    const showToast = (msg) => {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('visible');
+      setTimeout(() => t.classList.remove('visible'), 2500);
+    };
+
+    // ===== Demo Data =====
+    const DEMO_DISHES = [
+      {
+        id: 'demo-turkey',
+        name: 'Roast Turkey',
+        color: '#c85c2e',
+        steps: [
+          { name: 'Prep & Season', duration: 30, temp: null, notes: 'Butter under skin, herbs in cavity' },
+          { name: 'Roast at 325°F', duration: 180, temp: 325, notes: 'Baste every 45 min' },
+          { name: 'Rest', duration: 30, temp: null, notes: 'Tent with foil, don't skip!' }
+        ]
+      },
+      {
+        id: 'demo-stuffing',
+        name: 'Stuffing',
+        color: '#4a7c59',
+        steps: [
+          { name: 'Prep Vegetables', duration: 20, temp: null, notes: 'Celery, onion, herbs' },
+          { name: 'Mix & Stuff', duration: 15, temp: null, notes: 'Bread, broth, egg binder' },
+          { name: 'Bake at 350°F', duration: 45, temp: 350, notes: 'Cover first 30 min, uncover to brown' }
+        ]
+      },
+      {
+        id: 'demo-gravy',
+        name: 'Gravy',
+        color: '#2a6b8a',
+        steps: [
+          { name: 'Make Roux', duration: 10, temp: null, notes: 'Drippings + flour' },
+          { name: 'Simmer & Thicken', duration: 15, temp: null, notes: 'Add stock gradually' },
+          { name: 'Season & Strain', duration: 5, temp: null, notes: 'Salt, pepper, herbs' }
+        ]
+      },
+      {
+        id: 'demo-pie',
+        name: 'Pumpkin Pie',
+        color: '#b84a3a',
+        steps: [
+          { name: 'Make Crust', duration: 20, temp: null, notes: 'Chill 30 min before roll' },
+          { name: 'Mix Filling', duration: 10, temp: null, notes: 'Pumpkin, spices, eggs, cream' },
+          { name: 'Bake at 425°F', duration: 15, temp: 425, notes: 'High heat start' },
+          { name: 'Bake at 350°F', duration: 40, temp: 350, notes: 'Until center barely jiggles' },
+          { name: 'Cool', duration: 120, temp: null, notes: 'Minimum 2 hours before slice' }
+        ]
+      }
+    ];
+
+    // ===== DOM Elements =====
+    const dishForm = document.getElementById('dishForm');
+    const stepsList = document.getElementById('stepsList');
+    const timeline = document.getElementById('timeline');
+    const timeMarkers = document.getElementById('timeMarkers');
+    const emptyState = document.getElementById('emptyState');
+    const planningView = document.getElementById('planningView');
+    const activeView = document.getElementById('activeView');
+    const stepModal = document.getElementById('stepModal');
+    const stepForm = document.getElementById('stepForm');
+    const deleteModal = document.getElementById('deleteModal');
+    const nowLine = document.getElementById('nowLine');
+    const timelineWrap = document.getElementById('timelineWrap');
+
+    // ===== Time Markers =====
+    function renderTimeMarkers() {
+      timeMarkers.innerHTML = '';
+      for (let h = 0; h < 24; h++) {
+        const div = document.createElement('div');
+        div.className = 'time-marker' + (h % 3 === 0 ? ' major' : '');
+        div.textContent = h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h-12}p`;
+        timeMarkers.appendChild(div);
+      }
+    }
+
+    // ===== Steps List (Planning) =====
+    function renderStepsList(dishSteps = []) {
+      stepsList.innerHTML = '';
+      dishSteps.forEach((step, idx) => {
+        const row = document.createElement('div');
+        row.className = 'step-row';
+        row.dataset.index = idx;
+        row.innerHTML = `
+          <span class="drag-handle" aria-label="Drag to reorder" tabindex="0" role="button">⋮⋮</span>
+          <div class="form-group med">
+            <label>Step Name</label>
+            <input type="text" value="${escapeHtml(step.name)}" maxlength="40" readonly>
+          </div>
+          <div class="form-group small">
+            <label>Duration (min)</label>
+            <input type="number" value="${step.duration}" min="1" max="480" readonly>
+          </div>
+          <div class="form-group small">
+            <label>Temp (°F)</label>
+            <input type="text" value="${step.temp ? step.temp + '°F' : '—'}" readonly>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="edit" aria-label="Edit step">Edit</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="delete" aria-label="Delete step" style="color: var(--danger);">Del</button>
+        `;
+        stepsList.appendChild(row);
+      });
+      updateEmptyState();
+    }
+
+    function updateEmptyState() {
+      const hasDishes = dishes.length > 0;
+      emptyState.hidden = hasDishes;
+      timelineWrap.style.display = hasDishes ? 'block' : 'none';
+    }
+
+    // ===== Timeline Rendering =====
+    function computeLayout() {
+      // Returns {maxEndMin, dishLayouts: [{dish, stepsWithPos: [{step, startCol, spanCols, startMin, endMin}]}]}
+      let maxEndMin = 0;
+      const dishLayouts = dishes.map(dish => {
+        let currentMin = 0;
+        const stepsWithPos = dish.steps.map(step => {
+          const startMin = currentMin;
+          const endMin = currentMin + step.duration;
+          currentMin = endMin;
+          maxEndMin = Math.max(maxEndMin, endMin);
+          // Convert to 24h grid columns (each column = 1 hour)
+          const startCol = Math.floor(startMin / 60);
+          const endCol = Math.ceil(endMin / 60);
+          const spanCols = Math.max(1, endCol - startCol);
+          return { step, startCol, spanCols, startMin, endMin };
+        });
+        return { dish, stepsWithPos };
+      });
+      return { maxEndMin, dishLayouts };
+    }
+
+    function renderTimeline() {
+      const { maxEndMin, dishLayouts } = computeLayout();
+      // Clear existing dish rows (keep header rows)
+      const existingRows = timeline.querySelectorAll('.dish-row');
+      existingRows.forEach(r => r.remove());
+
+      dishLayouts.forEach(({ dish, stepsWithPos }) => {
+        // Label column
+        const label = document.createElement('div');
+        label.className = 'dish-label';
+        label.style.borderLeftColor = dish.color;
+        label.style.borderLeftWidth = '4px';
+        label.innerHTML = `
+          <span class="dish-name">${escapeHtml(dish.name)}</span>
+          <span class="dish-total">${fmtMin(dish.steps.reduce((s, st) => s + st.duration, 0))}</span>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="delete-dish" aria-label="Delete ${escapeHtml(dish.name)}" style="color: var(--danger); padding: 0.25rem;">×</button>
+        `;
+        label.dataset.dishId = dish.id;
+        timeline.appendChild(label);
+
+        // Track column
+        const track = document.createElement('div');
+        track.className = 'dish-track';
+        track.dataset.dishId = dish.id;
+        // Fill empty leading columns
+        stepsWithPos.forEach(({ startCol, spanCols, step, startMin, endMin }) => {
+          // Add empty cells before if gap
+          // (steps are sequential so no gaps, but just in case)
+        });
+        stepsWithPos.forEach(({ spanCols, step, startMin, endMin }) => {
+          const block = document.createElement('div');
+          block.className = 'step-block';
+          block.style.background = dish.color;
+          block.style.gridColumn = `span ${spanCols}`;
+          block.style.minWidth = '0';
+          block.title = `${step.name} (${fmtMin(step.duration)})${step.temp ? ` @ ${step.temp}°F` : ''}${step.notes ? `: ${step.notes}` : ''}`;
+          block.innerHTML = `
+            <span class="step-name">${escapeHtml(step.name)}</span>
+            <span class="step-duration">${fmtMin(step.duration)}</span>
+          `;
+          block.dataset.dishId = dish.id;
+          block.dataset.stepIndex = dish.steps.indexOf(step);
+          track.appendChild(block);
+        });
+        timeline.appendChild(track);
+      });
+
+      // Adjust timeline min-width based on maxEndMin
+      const minCols = Math.max(24, Math.ceil(maxEndMin / 60) + 2);
+      timeline.style.minWidth = `${140 + minCols * 48}px`; // approx 48px per col (40px + 8px gap)
+    }
+
+    // ===== Cooking Mode =====
+    function flattenSteps() {
+      allStepsFlat = [];
+      let absoluteMin = 0;
+      dishes.forEach(dish => {
+        dish.steps.forEach((step, stepIndex) => {
+          allStepsFlat.push({
+            dishId: dish.id,
+            dishName: dish.name,
+            dishColor: dish.color,
+            stepIndex,
+            step,
+            absoluteStart: absoluteMin,
+            absoluteEnd: absoluteMin + step.duration
+          });
+          absoluteMin += step.duration;
+        });
+      });
+    }
+
+    function enterCookingMode() {
+      if (dishes.length === 0 || dishes.every(d => d.steps.length === 0)) {
+        showToast('Add at least one dish with steps first');
+        return;
+      }
+      flattenSteps();
+      cookingMode = true;
+      cookStartTime = Date.now();
+      cookPausedTime = 0;
+      currentStepIndex = 0;
+      stepStartTime = cookStartTime;
+      stepDuration = minutesToMs(allStepsFlat[0].step.duration);
+
+      planningView.hidden = true;
+      activeView.hidden = false;
+      activeView.classList.add('visible');
+      document.getElementById('btnStartCooking').hidden = true;
+      document.getElementById('btnLoadDemo').hidden = true;
+
+      updateCookingUI();
+      startTimers();
+    }
+
+    function exitCookingMode() {
+      cookingMode = false;
+      stopTimers();
+      planningView.hidden = false;
+      activeView.hidden = true;
+      activeView.classList.remove('visible');
+      document.getElementById('btnStartCooking').hidden = false;
+      document.getElementById('btnLoadDemo').hidden = false;
+      nowLine.classList.remove('visible');
+    }
+
+    function startTimers() {
+      timerInterval = setInterval(updateCookingUI, 250);
+      nowLineUpdateInterval = setInterval(updateNowLine, 250);
+    }
+
+    function stopTimers() {
+      clearInterval(timerInterval);
+      clearInterval(nowLineUpdateInterval);
+      timerInterval = null;
+      nowLineUpdateInterval = null;
+    }
+
+    function updateCookingUI() {
+      if (!cookingMode) return;
+      const now = Date.now();
+      const elapsed = now - cookStartTime - cookPausedTime;
+      
+      // Update elapsed timer
+      document.getElementById('elapsedTime').textContent = fmtTime(elapsed);
+
+      // Find current step
+      let found = false;
+      allStepsFlat.forEach((s, idx) => {
+        const stepStartMs = minutesToMs(s.absoluteStart);
+        const stepEndMs = minutesToMs(s.absoluteEnd);
+        if (elapsed >= stepStartMs && elapsed < stepEndMs) {
+          if (idx !== currentStepIndex) {
+            currentStepIndex = idx;
+            stepStartTime = now;
+            stepDuration = stepEndMs - stepStartMs;
+          }
+          found = true;
+          renderCurrentStep(s, elapsed - stepStartMs, stepDuration);
+          renderUpcomingSteps(idx);
+        }
+      });
+
+      if (!found) {
+        // All done or before start
+        if (elapsed < 0) {
+          renderCurrentStep(allStepsFlat[0], 0, minutesToMs(allStepsFlat[0].step.duration));
+          renderUpcomingSteps(0);
+        } else {
+          // Finished
+          document.getElementById('stepCountdown').textContent = 'Done!';
+          document.getElementById('progressFill').style.width = '100%';
+          document.getElementById('currentStepName').textContent = 'All steps complete 🎉';
+          document.getElementById('currentStepMeta').textContent = '';
+          document.getElementById('btnCompleteStep').disabled = true;
+          document.getElementById('btnSkipStep').disabled = true;
+          renderUpcomingSteps(allStepsFlat.length - 1);
+        }
+      }
+    }
+
+    function renderCurrentStep(stepData, stepElapsed, stepTotalMs) {
+      const remaining = Math.max(0, stepTotalMs - stepElapsed);
+      document.getElementById('stepCountdown').textContent = fmtTime(remaining);
+      const pct = Math.min(100, (stepElapsed / stepTotalMs) * 100);
+      document.getElementById('progressFill').style.width = `${pct}%`;
+      document.getElementById('progressFill').parentElement.setAttribute('aria-valuenow', Math.round(pct));
+      
+      document.getElementById('currentStepName').textContent = stepData.step.name;
+      const metaParts = [];
+      metaParts.push(`${stepData.dishName} • Step ${stepData.stepIndex + 1} of ${dishes.find(d => d.id === stepData.dishId).steps.length}`);
+      if (stepData.step.temp) metaParts.push(`${stepData.step.temp}°F`);
+      if (stepData.step.notes) metaParts.push(stepData.step.notes);
+      document.getElementById('currentStepMeta').textContent = metaParts.join(' · ');
+      
+      document.getElementById('btnCompleteStep').disabled = false;
+      document.getElementById('btnSkipStep').disabled = false;
+
+      // Highlight active block in timeline
+      document.querySelectorAll('.step-block.active').forEach(b => b.classList.remove('active'));
+      const activeBlock = document.querySelector(`.step-block[data-dish-id="${stepData.dishId}"][data-step-index="${stepData.stepIndex}"]`);
+      if (activeBlock) activeBlock.classList.add('active');
+    }
+
+    function renderUpcomingSteps(currentIdx) {
+      const container = document.getElementById('upcomingSteps');
+      container.innerHTML = '';
+      for (let i = currentIdx + 1; i < Math.min(currentIdx + 6, allStepsFlat.length); i++) {
+        const s = allStepsFlat[i];
+        const div = document.createElement('div');
+        div.className = 'upcoming-step' + (i === currentIdx + 1 ? ' next' : '');
+        div.role = 'listitem';
+        div.innerHTML = `
+          <span class="step-color" style="background: ${s.dishColor}"></span>
+          <div class="step-details">
+            <div class="step-name">${escapeHtml(s.step.name)}</div>
+            <div class="step-meta">
+              <span>${escapeHtml(s.dishName)}</span>
+              <span class="step-time">${fmtMin(s.step.duration)}</span>
+              ${s.step.temp ? `<span>${s.step.temp}°F</span>` : ''}
+            </div>
+          </div>
+        `;
+        container.appendChild(div);
+      }
+      // Mark completed steps
+      for (let i = 0; i <= currentIdx; i++) {
+        const s = allStepsFlat[i];
+        const existing = container.querySelector(`.upcoming-step:nth-child(${i - currentIdx})`); // won't match, skip
+      }
+    }
+
+    function updateNowLine() {
+      if (!cookingMode) return;
+      const now = Date.now();
+      const elapsed = now - cookStartTime - cookPausedTime;
+      const elapsedMin = elapsed / 60000;
+      // Position relative to timeline-wrap
+      const wrapRect = timelineWrap.getBoundingClientRect();
+      const timelineRect = timeline.getBoundingClientRect();
+      // Each hour column is ~48px (40px + 8px gap), label column is 140px
+      const colWidth = 48;
+      const labelWidth = 140;
+      const x = labelWidth + elapsedMin / 60 * colWidth;
+      nowLine.style.left = `${wrapRect.left + x}px`;
+      nowLine.style.top = `${wrapRect.top}px`;
+      nowLine.style.height = `${wrapRect.height}px`;
+      nowLine.classList.add('visible');
+    }
+
+    function completeCurrentStep() {
+      if (currentStepIndex >= allStepsFlat.length - 1) {
+        exitCookingMode();
+        showToast('All done! Great job!');
+        return;
+      }
+      currentStepIndex++;
+      const nextStep = allStepsFlat[currentStepIndex];
+      stepStartTime = Date.now();
+      stepDuration = minutesToMs(nextStep.step.duration);
+      updateCookingUI();
+    }
+
+    function skipCurrentStep() {
+      completeCurrentStep();
+    }
+
+    function resetTimer() {
+      cookStartTime = Date.now();
+      cookPausedTime = 0;
+      currentStepIndex = 0;
+      stepStartTime = cookStartTime;
+      stepDuration = minutesToMs(allStepsFlat[0].step.duration);
+      updateCookingUI();
+    }
+
+    // ===== Event Handlers =====
+    // Dish Form
+    dishForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('dishName').value.trim();
+      const color = document.getElementById('dishColor').value;
+      if (!name) return;
+      
+      // Collect steps from stepsList
+      const stepRows = stepsList.querySelectorAll('.step-row');
+      const steps = [];
+      stepRows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        steps.push({
+          name: inputs[0].value,
+          duration: parseInt(inputs[1].value, 10),
+          temp: inputs[2].value === '—' ? null : parseInt(inputs[2].value, 10),
+          notes: row.dataset.notes || ''
+        });
+      });
+
+      if (editingDishId) {
+        const idx = dishes.findIndex(d => d.id === editingDishId);
+        if (idx >= 0) {
+          dishes[idx] = { ...dishes[idx], name, color, steps };
+          editingDishId = null;
+          dishForm.querySelector('button[type="submit"]').textContent = 'Add Dish';
+        }
+      } else {
+        dishes.push({ id: uid(), name, color, steps });
+      }
+      saveAndRender();
+      dishForm.reset();
+      // Reset color to first option
+      document.getElementById('dishColor').selectedIndex = 0;
+    });
+
+    // Add Step Button
+    document.getElementById('btnAddStep').addEventListener('click', () => {
+      stepEditIndex = -1;
+      document.getElementById('stepModalTitle').textContent = 'Add Cooking Step';
+      stepForm.reset();
+      stepModal.classList.add('visible');
+      setTimeout(() => document.getElementById('stepName').focus(), 50);
+    });
+
+    // Steps List Delegation
+    stepsList.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const row = btn.closest('.step-row');
+      const idx = parseInt(row.dataset.index, 10);
+      if (btn.dataset.action === 'edit') {
+        stepEditIndex = idx;
+        document.getElementById('stepModalTitle').textContent = 'Edit Cooking Step';
+        // We need to get step data from the current dish being edited
+        // Since stepsList only shows steps for the dish being added/edited, we need to track this
+        // For simplicity, we'll store current steps in a variable
+        const currentSteps = editingDishId 
+          ? dishes.find(d => d.id === editingDishId)?.steps || []
+          : getFormSteps();
+        const step = currentSteps[idx];
+        if (step) {
+          document.getElementById('stepName').value = step.name;
+          document.getElementById('stepDuration').value = step.duration;
+          document.getElementById('stepTemp').value = step.temp || '';
+          document.getElementById('stepNotes').value = step.notes || '';
+          stepModal.classList.add('visible');
+        }
+      } else if (btn.dataset.action === 'delete') {
+        if (editingDishId) {
+          const dish = dishes.find(d => d.id === editingDishId);
+          if (dish) {
+            dish.steps.splice(idx, 1);
+            renderStepsList(dish.steps);
+          }
+        } else {
+          const rows = Array.from(stepsList.querySelectorAll('.step-row'));
+          rows.splice(idx, 1).forEach(r => r.remove());
+          updateEmptyState();
+        }
+      }
+    });
+
+    function getFormSteps() {
+      const steps = [];
+      stepsList.querySelectorAll('.step-row').forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        steps.push({
+          name: inputs[0].value,
+          duration: parseInt(inputs[1].value, 10),
+          temp: inputs[2].value === '—' ? null : parseInt(inputs[2].value, 10),
+          notes: row.dataset.notes || ''
+        });
+      });
+      return steps;
+    }
+
+    // Step Modal Form
+    stepForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('stepName').value.trim();
+      const duration = parseInt(document.getElementById('stepDuration').value, 10);
+      const temp = document.getElementById('stepTemp').value;
+      const notes = document.getElementById('stepNotes').value.trim();
+      if (!name || !duration) return;
+
+      const step = { name, duration, temp: temp ? parseInt(temp, 10) : null, notes };
+
+      if (stepEditIndex >= 0) {
+        if (editingDishId) {
+          const dish = dishes.find(d => d.id === editingDishId);
+          if (dish) dish.steps[stepEditIndex] = step;
+        } else {
+          // Update the row in place
+          const row = stepsList.querySelector(`.step-row[data-index="${stepEditIndex}"]`);
+          if (row) {
+            const inputs = row.querySelectorAll('input');
+            inputs[0].value = name;
+            inputs[1].value = duration;
+            inputs[2].value = step.temp ? step.temp + '°F' : '—';
+            row.dataset.notes = notes;
+          }
+        }
+      } else {
+        if (editingDishId) {
+          const dish = dishes.find(d => d.id === editingDishId);
+          if (dish) dish.steps.push(step);
+        } else {
+          const idx = stepsList.querySelectorAll('.step-row').length;
+          const row = document.createElement('div');
+          row.className = 'step-row';
+          row.dataset.index = idx;
+          row.dataset.notes = notes;
+          row.innerHTML = `
+            <span class="drag-handle" aria-label="Drag to reorder" tabindex="0" role="button">⋮⋮</span>
+            <div class="form-group med">
+              <label>Step Name</label>
+              <input type="text" value="${escapeHtml(name)}" maxlength="40" readonly>
+            </div>
+            <div class="form-group small">
+              <label>Duration (min)</label>
+              <input type="number" value="${duration}" min="1" max="480" readonly>
+            </div>
+            <div class="form-group small">
+              <label>Temp (°F)</label>
+              <input type="text" value="${step.temp ? step.temp + '°F' : '—'}" readonly>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="edit" aria-label="Edit step">Edit</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="delete" aria-label="Delete step" style="color: var(--danger);">Del</button>
+          `;
+          stepsList.appendChild(row);
+          // Re-index
+          stepsList.querySelectorAll('.step-row').forEach((r, i) => r.dataset.index = i);
+        }
+      }
+      stepModal.classList.remove('visible');
+      if (editingDishId) renderStepsList(dishes.find(d => d.id === editingDishId).steps);
+      saveAndRender();
+    });
+
+    document.getElementById('btnCancelStep').addEventListener('click', () => stepModal.classList.remove('visible'));
+    stepModal.addEventListener('click', (e) => { if (e.target === stepModal) stepModal.classList.remove('visible'); });
+
+    // Timeline Delegation (Delete Dish)
+    timeline.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action="delete-dish"]');
+      if (!btn) return;
+      const label = btn.closest('.dish-label');
+      const dishId = label.dataset.dishId;
+      const dish = dishes.find(d => d.id === dishId);
+      if (dish) {
+        document.getElementById('deleteDishName').textContent = dish.name;
+        deleteModal.dataset.dishId = dishId;
+        deleteModal.classList.add('visible');
+      }
+    });
+
+    document.getElementById('btnConfirmDelete').addEventListener('click', () => {
+      const dishId = deleteModal.dataset.dishId;
+      dishes = dishes.filter(d => d.id !== dishId);
+      if (editingDishId === dishId) {
+        editingDishId = null;
+        dishForm.reset();
+        document.getElementById('dishColor').selectedIndex = 0;
+        dishForm.querySelector('button[type="submit"]').textContent = 'Add Dish';
+        stepsList.innerHTML = '';
+      }
+      deleteModal.classList.remove('visible');
+      saveAndRender();
+    });
+    document.getElementById('btnCancelDelete').addEventListener('click', () => deleteModal.classList.remove('visible'));
+    deleteModal.addEventListener('click', (e) => { if (e.target === deleteModal) deleteModal.classList.remove('visible'); });
+
+    // Cooking Controls
+    document.getElementById('btnStartCooking').addEventListener('click', enterCookingMode);
+    document.getElementById('btnStopCooking').addEventListener('click', exitCookingMode);
+    document.getElementById('btnCompleteStep').addEventListener('click', completeCurrentStep);
+    document.getElementById('btnSkipStep').addEventListener('click', skipCurrentStep);
+    document.getElementById('btnResetTimer').addEventListener('click', resetTimer);
+
+    // Demo Buttons
+    document.getElementById('btnLoadDemo').addEventListener('click', loadDemo);
+    document.getElementById('btnLoadDemo2').addEventListener('click', loadDemo);
+
+    function loadDemo() {
+      dishes = DEMO_DISHES.map(d => ({ ...d, id: uid() }));
+      saveAndRender();
+      showToast('Thanksgiving demo loaded!');
+    }
+
+    // ===== Persistence =====
+    function saveAndRender() {
+      storage.set(dishes);
+      renderStepsList(editingDishId ? dishes.find(d => d.id === editingDishId)?.steps || [] : []);
+      renderTimeline();
+      updateEmptyState();
+    }
+
+    function loadSaved() {
+      const saved = storage.get();
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        dishes = saved;
+      } else {
+        // Load demo by default for first-time judges
+        dishes = DEMO_DISHES.map(d => ({ ...d, id: uid() }));
+        storage.set(dishes);
+      }
+      saveAndRender();
+    }
+
+    // ===== Drag to Reorder Steps (Simple Implementation) =====
+    let dragSrc = null;
+    stepsList.addEventListener('dragstart', (e) => {
+      const handle = e.target.closest('.drag-handle');
+      if (!handle) return;
+      const row = handle.closest('.step-row');
+      dragSrc = row;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', row.dataset.index);
+    });
+    stepsList.addEventListener('dragend', (e) => {
+      if (dragSrc) dragSrc.classList.remove('dragging');
+      dragSrc = null;
+    });
+    stepsList.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const row = e.target.closest('.step-row');
+      if (row && row !== dragSrc) {
+        const rect = row.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) row.style.borderTop = '2px solid var(--accent)';
+        else row.style.borderBottom = '2px solid var(--accent)';
+      }
+    });
+    stepsList.addEventListener('dragleave', (e) => {
+      if (!e.relatedTarget || !stepsList.contains(e.relatedTarget)) {
+        stepsList.querySelectorAll('.step-row').forEach(r => {
+          r.style.borderTop = '';
+          r.style.borderBottom = '';
+        });
+      }
+    });
+    stepsList.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetRow = e.target.closest('.step-row');
+      stepsList.querySelectorAll('.step-row').forEach(r => {
+        r.style.borderTop = '';
+        r.style.borderBottom = '';
+      });
+      if (!dragSrc || !targetRow || dragSrc === targetRow) return;
+      
+      const fromIdx = parseInt(dragSrc.dataset.index, 10);
+      const toIdx = parseInt(targetRow.dataset.index, 10);
+      
+      if (editingDishId) {
+        const dish = dishes.find(d => d.id === editingDishId);
+        if (dish) {
+          const [moved] = dish.steps.splice(fromIdx, 1);
+          dish.steps.splice(toIdx, 0, moved);
+          renderStepsList(dish.steps);
+        }
+      } else {
+        const rows = Array.from(stepsList.querySelectorAll('.step-row'));
+        const [moved] = rows.splice(fromIdx, 1);
+        rows.splice(toIdx, 0, moved);
+        rows.forEach((r, i) => r.dataset.index = i);
+        stepsList.innerHTML = '';
+        rows.forEach(r => stepsList.appendChild(r));
+      }
+      saveAndRender();
+    });
+
+    // Touch drag support (basic)
+    let touchDragSrc = null;
+    let touchStartY = 0;
+    stepsList.addEventListener('touchstart', (e) => {
+      const handle = e.target.closest('.drag-handle');
+      if (!handle) return;
+      touchDragSrc = handle.closest('.step-row');
+      touchStartY = e.touches[0].clientY;
+      touchDragSrc.classList.add('dragging');
+    }, { passive: true });
+    stepsList.addEventListener('touchmove', (e) => {
+      if (!touchDragSrc) return;
+      e.preventDefault();
+      const y = e.touches[0].clientY;
+      const delta = y - touchStartY;
+      touchDragSrc.style.transform = `translateY(${delta}px)`;
+      touchDragSrc.style.zIndex = 10;
+      // Find target
+      const target = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      const targetRow = target?.closest('.step-row');
+      stepsList.querySelectorAll('.step-row').forEach(r => {
+        r.style.borderTop = '';
+        r.style.borderBottom = '';
+      });
+      if (targetRow && targetRow !== touchDragSrc) {
+        const rect = targetRow.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (y < midY) targetRow.style.borderTop = '2px solid var(--accent)';
+        else targetRow.style.borderBottom = '2px solid var(--accent)';
+      }
+    }, { passive: false });
+    stepsList.addEventListener('touchend', (e) => {
+      if (!touchDragSrc) return;
+      const target = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      const targetRow = target?.closest('.step-row');
+      touchDragSrc.classList.remove('dragging');
+      touchDragSrc.style.transform = '';
+      touchDragSrc.style.zIndex = '';
+      stepsList.querySelectorAll('.step-row').forEach(r => {
+        r.style.borderTop = '';
+        r.style.borderBottom = '';
+      });
+      if (targetRow && targetRow !== touchDragSrc) {
+        const fromIdx = parseInt(touchDragSrc.dataset.index, 10);
+        const toIdx = parseInt(targetRow.dataset.index, 10);
+        if (editingDishId) {
+          const dish = dishes.find(d => d.id === editingDishId);
+          if (dish) {
+            const [moved] = dish.steps.splice(fromIdx, 1);
+            dish.steps.splice(toIdx, 0, moved);
+            renderStepsList(dish.steps);
+          }
+        } else {
+          const rows = Array.from(stepsList.querySelectorAll('.step-row'));
+          const [moved] = rows.splice(fromIdx, 1);
+          rows.splice(toIdx, 0, moved);
+          rows.forEach((r, i) => r.dataset.index = i);
+          stepsList.innerHTML = '';
+          rows.forEach(r => stepsList.appendChild(r));
+        }
+        saveAndRender();
+      }
+      touchDragSrc = null;
+    });
+
+    // ===== Escape Key Handling =====
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        stepModal.classList.remove('visible');
+        deleteModal.classList.remove('visible');
+      }
+    });
+
+    // ===== Escape HTML =====
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ===== Init =====
+    renderTimeMarkers();
+    loadSaved();
+  </script>
+</body>
+</html>
