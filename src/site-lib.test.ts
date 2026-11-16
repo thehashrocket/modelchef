@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { abstentionKind, atomFeed, card, guestNotes, nextEpisodeLine, nextSaturday, dishChrome, featuredCard, fmtScores, judgeChips, judgeClass, judgeCss, panelJudges, unknownJudgeIds, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
-import { GUEST_UNEVEN_REASON, SAME_FAMILY_REASON, type DuelVote, type Entry, type Episode, type PressureTest } from './state';
+import { GUEST_SKIPPED_NO_CREDIT, GUEST_UNEVEN_REASON, SAME_FAMILY_REASON, type DuelVote, type Entry, type Episode, type PressureTest } from './state';
 
 const entry = (contestant: string, total: number, over: Partial<Entry> = {}): Entry => ({
   contestant,
@@ -382,8 +382,8 @@ describe('atomFeed', () => {
 
 describe('guestNotes', () => {
   it('says why the guest sat out', () => {
-    const ep = episode(null, { type: 'finale', guestSkipped: 'The OpenRouter key has $0.40 of its limit left; the guest judge needs at least $1.50.' });
-    assert.match(guestNotes(ep), /<p class="sub note">The guest judge did not take part\. The OpenRouter key has \$0\.40/);
+    const ep = episode(null, { type: 'finale', guestSkipped: GUEST_SKIPPED_NO_CREDIT });
+    assert.equal(guestNotes(ep), '<p class="sub note">The guest judge did not take part. There was not enough credit for it.</p>');
   });
   it('says the single guest score was kept, naming the chef', () => {
     const ep = episode(null, { type: 'finale', guestRuleSkipped: 'dropping the guest would leave gpt-oss unjudged' });

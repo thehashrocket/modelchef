@@ -38,6 +38,7 @@ import {
   type PressureTest,
   type Scores,
   type SeasonState,
+  GUEST_SKIPPED_NO_CREDIT,
   SAME_FAMILY_REASON,
 } from './state';
 import type { Msg } from './llm';
@@ -338,8 +339,13 @@ async function main() {
   if (guest) {
     const decision = decideGuest(await guestCredit(guest), GUEST_MIN_CREDIT_USD);
     if (!decision.run) {
-      guestSkipped = decision.reason;
-      warn(`${decision.reason} The finale runs on schedule without the guest judge.`);
+      // The account's figures never go public: not in the record, not on the site, and not in
+      // GitHub Actions logs (public for a public repo). Local runs print them.
+      guestSkipped = GUEST_SKIPPED_NO_CREDIT;
+      const why = process.env.GITHUB_ACTIONS
+        ? `OpenRouter credit is below GUEST_MIN_CREDIT_USD (amounts not logged on Actions; run pnpm check-models locally, or see the OpenRouter dashboard).`
+        : decision.reason;
+      warn(`${why} The finale runs on schedule without the guest judge.`);
       guest = null;
     } else if (decision.warning) warn(decision.warning);
   }
