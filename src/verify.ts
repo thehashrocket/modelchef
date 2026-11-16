@@ -1,6 +1,7 @@
 // `pnpm verify`: the automated part of every site PR's Definition of done.
-// Unit tests (and at least one must run), typecheck, the real build, then a
-// build of each committed fixture. Manual viewport checks are still needed.
+// Unit tests (and at least one must run), typecheck, then the site built from
+// data/ and from each committed fixture, with every link checked after each
+// build. Manual viewport checks are still needed.
 import { spawnSync } from 'node:child_process';
 
 function run(label: string, cmd: string, args: string[], env: Record<string, string> = {}): string {
@@ -22,11 +23,16 @@ if (!tests) {
 }
 
 run('typecheck', 'pnpm', ['exec', 'tsc', '--noEmit']);
-run('build: data/', 'pnpm', ['exec', 'tsx', 'src/build-site.ts']);
 
-const FIXTURES = ['three-episodes'];
-for (const name of FIXTURES) {
-  run(`build: test/fixtures/data/${name}`, 'pnpm', ['exec', 'tsx', 'src/build-site.ts'], { DATA_DIR: `test/fixtures/data/${name}` });
+/** Each build wipes dist/, so links are checked right after it. */
+const builds: { label: string; env: Record<string, string>; episodes?: number }[] = [
+  { label: 'data/', env: {} },
+  { label: 'test/fixtures/data/three-episodes', env: { DATA_DIR: 'test/fixtures/data/three-episodes' }, episodes: 3 },
+  { label: 'test/fixtures/data/two-seasons', env: { DATA_DIR: 'test/fixtures/data/two-seasons' }, episodes: 4 },
+];
+for (const b of builds) {
+  run(`build: ${b.label}`, 'pnpm', ['exec', 'tsx', 'src/build-site.ts'], b.env);
+  run(`check-links: ${b.label}`, 'pnpm', ['exec', 'tsx', 'src/check-links.ts', ...(b.episodes ? ['--expect-episodes', String(b.episodes)] : [])], b.env);
 }
 
-console.log(`\n[verify] OK: ${tests} tests, typecheck, real build, ${FIXTURES.length} fixture build(s).`);
+console.log(`\n[verify] OK: ${tests} tests, typecheck, ${builds.length} builds with links checked.`);

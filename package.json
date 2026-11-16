@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "list-models": "tsx --env-file-if-exists=.env src/list-models.ts",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "verify": "tsx src/verify.ts"
+    "verify": "tsx src/verify.ts",
+    "check-links": "tsx src/check-links.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
