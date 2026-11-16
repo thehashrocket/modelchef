@@ -36,6 +36,10 @@ describe('check-links parsing', () => {
   it('reads href and src, decoding entities', () => {
     assert.deepEqual(extractLinks(`<a class="x" href="a.html?x=1&amp;y=2">x</a><img loading="lazy" src='b.jpg'><iframe src="apps/c.html" title="t"></iframe>`), ['a.html?x=1&y=2', 'b.jpg', 'apps/c.html']);
   });
+  it('reads share-tag URLs, not other meta content', () => {
+    const html = `<meta property="og:image" content="https://e.test/a.jpg?v=1"><meta name="twitter:image" content="https://e.test/b.jpg"><meta property="og:url" content="https://e.test/"><meta property="og:title" content="x.html">`;
+    assert.deepEqual(extractLinks(html), ['https://e.test/a.jpg?v=1', 'https://e.test/b.jpg', 'https://e.test/']);
+  });
   it('reads ids', () => {
     assert.deepEqual([...extractIds(`<h2 id="season-01-ep-01">x</h2><div id='episodes'>`)], ['season-01-ep-01', 'episodes']);
   });

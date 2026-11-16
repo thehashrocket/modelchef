@@ -5,6 +5,16 @@ import { CONTESTANTS, DATA_DIR, SEASON, type Lens } from './config';
 export type IngredientCheck = 'present' | 'missing' | 'unchecked';
 
 export type EpisodeType = 'mystery-box' | 'invention' | 'finale';
+export const TYPE_LABEL: Record<EpisodeType, string> = { 'mystery-box': 'Mystery Box', invention: 'Invention Test', finale: 'Finale' };
+
+/** A folder named "pilot" is a trial run: shown on the site, never counted. */
+export const isPilot = (season: string) => season === 'pilot';
+/** "season-01" → "Season 1". */
+export const seasonLabel = (season: string) => {
+  if (isPilot(season)) return 'Pilot';
+  const m = /^season-0*(\d+)$/.exec(season);
+  return m ? `Season ${m[1]}` : season;
+};
 export type Outcome = 'won' | 'safe' | 'survived the pressure test' | 'eliminated';
 
 export interface Scores {
