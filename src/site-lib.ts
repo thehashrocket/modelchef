@@ -56,6 +56,17 @@ export function abstentionKind(reason: string, guestUnevenReason?: string): Excl
 }
 export const pad = (n: number) => String(n).padStart(2, '0');
 export { isPilot, seasonLabel, TYPE_LABEL };
+/**
+ * Marks a link, button or disclosure for the page's analytics listener: a click
+ * (or opening a <details>) sends `name` with these props to Vercel and Google
+ * Analytics. Props are ids and numbers only, never model-written text.
+ */
+export function evAttrs(name: string, props: Record<string, string | number | boolean> = {}): string {
+  return ` data-ev="${esc(name)}" data-ev-props="${esc(JSON.stringify(props))}"`;
+}
+/** The analytics props that identify a dish. */
+const dishProps = (season: string, ep: Episode, e: Entry) => ({ season, episode: ep.number, chef: e.contestant, rank: e.rank, featured: e.contestant === ep.winner });
+
 export const fmtDate = (iso: string) => {
   const d = new Date(`${iso}T12:00:00Z`);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -304,7 +315,9 @@ export function notesBlock(ep: Episode, e: Entry, open: boolean): string {
         return `<blockquote><b>${monogram(a.judge, name)}${esc(name)} abstained</b>${plain ? `<span class="why">${esc(plain)}</span>` : ''}<small>${esc(a.reason)}</small>${provenance(ep, a)}</blockquote>`;
       })
       .join('');
-  return open ? `<div class="notes"><h4>Judges' notes</h4>${quotes}</div>` : `<details><summary>Judges' notes</summary>${quotes}</details>`;
+  return open
+    ? `<div class="notes"><h4>Judges' notes</h4>${quotes}</div>`
+    : `<details${evAttrs('notes_open', { episode: ep.number, chef: e.contestant })}><summary>Judges' notes</summary>${quotes}</details>`;
 }
 
 const twoDp = (n: number) => n.toFixed(2);
@@ -327,13 +340,13 @@ function plate(season: string, ep: Episode, e: Entry, root: string): string {
   // Every dish sits on the same neutral mat under a fake browser bar, so light and dark apps read as one set.
   return e.forfeit
     ? `<div class="plate shot"><div class="noshot">No dish served.<br>${esc(e.forfeit)}</div></div>`
-    : `<a class="plate shot" href="${base}/play-${e.contestant}.html" aria-label="Open ${esc(e.title)}"><span class="chrome" aria-hidden="true"><i></i><i></i><i></i></span><img loading="lazy" src="${base}/shots/${e.contestant}-desktop.jpg" alt="Screenshot of ${esc(e.title)} at desktop width" width="1280" height="800"></a>`;
+    : `<a class="plate shot" href="${base}/play-${e.contestant}.html"${evAttrs('dish_open', { ...dishProps(season, ep, e), from: 'thumbnail' })} aria-label="Open ${esc(e.title)}"><span class="chrome" aria-hidden="true"><i></i><i></i><i></i></span><img loading="lazy" src="${base}/shots/${e.contestant}-desktop.jpg" alt="Screenshot of ${esc(e.title)} at desktop width" width="1280" height="800"></a>`;
 }
 
 const scoreText = (ep: Episode, e: Entry) =>
   e.forfeit ? '–' : `<span title="${esc(SCORE_EXPLAINED)}">${episodeFmt(ep)(e.total)}</span><span class="outof">/10</span>`;
 const openLink = (season: string, ep: Episode, e: Entry, root: string) =>
-  e.forfeit ? '' : `<a class="play" href="${root}${epPath(season, ep)}/play-${e.contestant}.html">Open the dish &rarr;</a>`;
+  e.forfeit ? '' : `<a class="play" href="${root}${epPath(season, ep)}/play-${e.contestant}.html"${evAttrs('dish_open', { ...dishProps(season, ep, e), from: 'link' })}>Open the dish &rarr;</a>`;
 const presentation = (e: Entry) =>
   e.presentation ? `<details class="says"><summary>What the chef told the judges</summary><p>${esc(e.presentation)}</p></details>` : '';
 
@@ -395,7 +408,7 @@ export function briefBlock(ep: Episode): string {
   // Episodes recorded before the brief was stored are rebuilt from their type and theme.
   const brief =
     ep.brief ?? challengeText({ type: ep.type, theme: ep.theme, ingredient: ep.ingredient?.text ?? null, guest: ep.guestJudge ?? null });
-  return `<details class="brief"><summary>The brief the chefs were given</summary><p>${esc(brief).replace(/\n+/g, '</p><p>')}</p><pre>${esc(RULES)}</pre><p>Each chef also sees its own record, the judges' notes on its last dish, the standings, and what won the previous episode.</p></details>`;
+  return `<details class="brief"${evAttrs('brief_open', { episode: ep.number })}><summary>The brief the chefs were given</summary><p>${esc(brief).replace(/\n+/g, '</p><p>')}</p><pre>${esc(RULES)}</pre><p>Each chef also sees its own record, the judges' notes on its last dish, the standings, and what won the previous episode.</p></details>`;
 }
 
 /** Finale notes from the record: the guest sat out for lack of credit, or its single score was kept. */
@@ -447,16 +460,18 @@ export function dishChrome(
   ep: Episode,
   opts: { entry?: Entry; pressureChef?: string; prev?: DishLink; next?: DishLink; other?: DishLink },
 ): { bar: string; panel: string } {
-  const back = `<a class="back" href="index.html">&larr;<span class="wl"> Episode ${ep.number}</span></a>`;
-  const verdict = `<button type="button" class="vbtn" aria-expanded="false" aria-controls="verdict">Verdict</button>`;
+  const back = `<a class="back" href="index.html"${evAttrs('episode_nav', { to: 'episode', from: 'dish', episode: ep.number })}>&larr;<span class="wl"> Episode ${ep.number}</span></a>`;
+  const who = opts.entry?.contestant ?? opts.pressureChef ?? '';
+  // The Verdict script sends verdict_open itself, only when the panel opens (not on close).
+  const verdict = `<button type="button" class="vbtn" aria-expanded="false" aria-controls="verdict" data-ev-props="${esc(JSON.stringify({ season, episode: ep.number, chef: who, pressure: !opts.entry }))}">Verdict</button>`;
   const footer = `<p class="fine">Unedited model output. The dish runs sandboxed with the network blocked.</p>
 <p><a href="../../../index.html">What is ModelChef? &rarr;</a></p>`;
 
   if (opts.entry) {
     const e = opts.entry;
     const nav = [
-      opts.prev ? `<a href="${opts.prev.href}" aria-label="Previous dish: ${esc(opts.prev.label)}">&lsaquo; Prev</a>` : '',
-      opts.next ? `<a href="${opts.next.href}" aria-label="Next dish: ${esc(opts.next.label)}">Next &rsaquo;</a>` : '',
+      opts.prev ? `<a href="${opts.prev.href}"${evAttrs('dish_nav', { dir: 'prev', episode: ep.number, from: who })} aria-label="Previous dish: ${esc(opts.prev.label)}">&lsaquo; Prev</a>` : '',
+      opts.next ? `<a href="${opts.next.href}"${evAttrs('dish_nav', { dir: 'next', episode: ep.number, from: who })} aria-label="Next dish: ${esc(opts.next.label)}">Next &rsaquo;</a>` : '',
     ].join('');
     const bar = `<header class="bar">${back}<b class="t">${esc(e.title)}</b><span class="r2"><span class="m">by ${esc(chefName(e.contestant))} · #${e.rank} · ${episodeFmt(ep)(e.total)}/10</span><span class="pn">${nav}</span></span>${verdict}</header>`;
     const panel = `${e.contestant === ep.winner ? guestNotes(ep) : ''}${e.pitch ? `<p class="pitch">${esc(e.pitch)}</p>` : ''}
@@ -470,7 +485,7 @@ ${footer}`;
   const p = ep.pressure!;
   const chef = chefName(id);
   const picks = p.votes.filter((v) => v.winner === id).length;
-  const nav = opts.other ? `<a href="${opts.other.href}">Other dish: ${esc(opts.other.label)} &rsaquo;</a>` : '';
+  const nav = opts.other ? `<a href="${opts.other.href}"${evAttrs('dish_nav', { dir: 'other', episode: ep.number, from: who })}>Other dish: ${esc(opts.other.label)} &rsaquo;</a>` : '';
   const bar = `<header class="bar">${back}<b class="t">Pressure test</b><span class="r2"><span class="m">by ${esc(chef)}</span><span class="pn">${nav}</span></span>${verdict}</header>`;
   const votes = p.votes
     .map((v) => voteItem(ep, v))
@@ -542,4 +557,39 @@ export function atomFeed(siteUrl: string, items: FeedItem[], now: Date): string 
 ${entries}
 </feed>
 `;
+}
+
+// ---------------------------------------------------------------------------
+// Search engines: sitemap.xml and robots.txt (absolute URLs, so only when the site URL is known).
+
+export interface SitemapUrl {
+  /** Site path with a leading slash, e.g. "/s/season-01/ep-01/". */
+  path: string;
+  /** YYYY-MM-DD */
+  lastmod?: string;
+}
+
+/** A sitemaps.org 0.9 sitemap. `siteUrl` is absolute, without a trailing slash. */
+export function sitemapXml(siteUrl: string, urls: SitemapUrl[]): string {
+  const items = urls
+    .map((u) => `  <url><loc>${xmlText(siteUrl + u.path)}</loc>${u.lastmod ? `<lastmod>${xmlText(u.lastmod)}</lastmod>` : ''}</url>`)
+    .join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${items}
+</urlset>
+`;
+}
+
+/**
+ * Crawl everything except the raw dishes: their sandboxed copies (apps/,
+ * pressure/) are model output, shown on the dish pages. Names the sitemap
+ * when there is one.
+ */
+export function robotsTxt(siteUrl: string): string {
+  return `User-agent: *
+Allow: /
+Disallow: /s/*/apps/
+Disallow: /s/*/pressure/
+${siteUrl ? `\nSitemap: ${siteUrl}/sitemap.xml\n` : ''}`;
 }
