@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { extractLinks } from './links';
-import { evAttrs, robotsTxt, sitemapXml } from './site-lib';
+import { evAttrs, metaTags, robotsTxt, sitemapXml } from './site-lib';
 
 describe('evAttrs', () => {
   it('marks an element with an event name and JSON props, escaped for an attribute', () => {
@@ -24,6 +24,13 @@ describe('sitemapXml', () => {
   it('its locations are read by check-links', () => {
     assert.deepEqual(extractLinks(xml), ['https://e.test/', 'https://e.test/s/season-01/ep-01/', 'https://e.test/a&b.html']);
   });
+});
+
+describe('canonical URL', () => {
+  const m = { title: 't', description: 'd', path: '/s/season-01/ep-01/' };
+  it('points every page at the main domain when the site URL is known', () =>
+    assert.match(metaTags(m, 'https://modelchef.tv'), /<link rel="canonical" href="https:\/\/modelchef\.tv\/s\/season-01\/ep-01\/">/));
+  it('is left out without a site URL (no relative canonical)', () => assert.ok(!metaTags(m, '').includes('canonical')));
 });
 
 describe('robotsTxt', () => {
