@@ -469,3 +469,64 @@ ${votes ? `<ul class="votes">${votes}</ul>` : ''}
 ${footer}`;
   return { bar, panel };
 }
+
+// ---------------------------------------------------------------------------
+// The episode feed (Atom) and the next-episode line.
+
+/** The first Saturday strictly after an ISO date (YYYY-MM-DD), in UTC. */
+export function nextSaturday(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + (((6 - d.getUTCDay() + 7) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
+/** "Episodes air Saturdays; next expected November 21." or '' once that date has passed or the season is over. */
+export function nextEpisodeLine(latestDate: string | undefined, seasonOver: boolean, today: string): string {
+  if (!latestDate || seasonOver) return '';
+  const next = nextSaturday(latestDate);
+  if (next < today) return '';
+  const label = new Date(`${next}T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+  return `Episodes air Saturdays; next expected ${label}.`;
+}
+
+/** Text safe for XML: control characters XML 1.0 forbids are dropped, then the five specials escaped. */
+export const xmlText = (s: unknown) =>
+  esc(String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')).replace(/&#39;/g, '&apos;');
+
+export interface FeedItem {
+  season: string;
+  ep: Episode;
+}
+
+/** A complete Atom 1.0 feed, newest episode first. `siteUrl` is absolute, without a trailing slash. */
+export function atomFeed(siteUrl: string, items: FeedItem[], now: Date): string {
+  const multi = new Set(items.map((i) => i.season)).size > 1;
+  const sorted = [...items].sort((a, b) => b.ep.date.localeCompare(a.ep.date) || b.season.localeCompare(a.season) || b.ep.number - a.ep.number);
+  const stamp = (date: string) => `${date}T17:23:00Z`;
+  const updated = sorted[0] ? stamp(sorted[0].ep.date) : now.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const entries = sorted
+    .map(({ season, ep }) => {
+      const url = `${siteUrl}/${epPath(season, ep)}/`;
+      const title = `${multi ? `${seasonLabel(season)}, ` : ''}Episode ${ep.number}: ${TYPE_LABEL[ep.type]}${ep.theme ? ` "${ep.theme}"` : ''}`;
+      return `  <entry>
+    <title>${xmlText(title)}</title>
+    <link href="${xmlText(url)}"/>
+    <id>${xmlText(url)}</id>
+    <updated>${stamp(ep.date)}</updated>
+    <summary>${xmlText(recapText(season, ep))}</summary>
+  </entry>`;
+    })
+    .join('\n');
+  return `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>ModelChef</title>
+  <subtitle>A weekly cooking competition for language models.</subtitle>
+  <id>${xmlText(siteUrl)}/</id>
+  <link href="${xmlText(siteUrl)}/"/>
+  <link rel="self" href="${xmlText(siteUrl)}/feed.xml"/>
+  <updated>${updated}</updated>
+  <author><name>ModelChef</name></author>
+${entries}
+</feed>
+`;
+}

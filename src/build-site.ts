@@ -6,6 +6,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, write
 import { join } from 'node:path';
 import { CONTESTANTS, DATA_DIR, JUDGES, SEASON } from './config';
 import {
+  atomFeed,
   chefName,
   dishChrome,
   episodeBlock,
@@ -17,6 +18,7 @@ import {
   judgeCss,
   metaTags,
   monogram,
+  nextEpisodeLine,
   unknownJudgeIds,
   pad,
   recapHtml,
@@ -26,6 +28,7 @@ import {
   seasonLabel,
   TYPE_LABEL,
   type DishLink,
+  type FeedItem,
   type MetaInput,
 } from './site-lib';
 import { average, type Entry, type Episode, type SeasonState } from './state';
@@ -125,6 +128,7 @@ tr.out td{color:var(--muted)}
 .play{margin-top:auto;font-weight:700}
 .recap{font-size:1.05rem;color:var(--ink);max-width:70ch;margin:0 0 18px;overflow-wrap:anywhere}
 .status .recap-line{font-weight:400;overflow-wrap:anywhere}
+.status .upnext{font-weight:400;color:var(--muted)}
 h3{overflow-wrap:anywhere}
 .feature{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:grid;grid-template-columns:1fr;margin-bottom:18px}
 .feature h3{font-size:1.6rem}
@@ -156,7 +160,7 @@ header.compact h1 a{color:inherit;text-decoration:none}
 .earlier span{display:block;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
 `;
 
-function page(title: string, body: string, meta = ''): string {
+function page(title: string, body: string, meta = '', root = ''): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -164,7 +168,7 @@ function page(title: string, body: string, meta = ''): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="A weekly cooking competition for language models, where the dishes are single-file web apps and the judges are models too.">
-${meta}
+${meta}${FEED ? `\n<link rel="alternate" type="application/atom+xml" title="ModelChef episodes" href="${root}feed.xml">` : ''}
 <style>${STYLE}</style>
 </head>
 <body><div class="wrap">${body}</div></body>
@@ -307,10 +311,10 @@ function siteHeader(opts: { compact: boolean; root: string; status?: string; lat
 </header>`;
 }
 
-function siteFooter(repo: string | undefined): string {
+function siteFooter(repo: string | undefined, root = ''): string {
   return `<footer><p>Model output and scores are never edited. Recaps and labels are generated from the episode record by code.</p>
 <p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}">github.com/${esc(repo)}</a>.` : ''}</p>
-<p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p></footer>`;
+<p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p>${FEED ? `\n<p><a href="${root}feed.xml">Episode feed (Atom)</a></p>` : ''}</footer>`;
 }
 
 /** The episode's own page, at s/<season>/ep-NN/index.html. */
@@ -324,13 +328,16 @@ function episodePage(season: string, ep: Episode, prev: Episode | undefined, nex
 ${nav}
 ${episodeBlock(season, ep, root)}
 ${nav}
-${siteFooter(repo)}`,
+${siteFooter(repo, root)}`,
     meta,
+    root,
   );
 }
 
 /** The site's absolute URL for share tags, resolved once in main(). */
 let SITE_URL = '';
+/** Whether this build writes feed.xml (it needs absolute URLs). */
+let FEED = false;
 const imageVersions = new Map<string, string>();
 /**
  * Share tags for a page. `image` is a path inside dist/; it is used only if the
@@ -409,7 +416,9 @@ function main() {
 
   const site = resolveSiteUrl(process.env);
   SITE_URL = site.url;
+  FEED = !!SITE_URL;
   console.log(`[modelchef] ${site.note}`);
+  const feedItems: FeedItem[] = [];
 
   const repo = process.env.GITHUB_REPOSITORY;
   let status = esc(`${seasonLabel(SEASON)} starts Saturday.`);
@@ -422,6 +431,7 @@ function main() {
       (e) => JSON.parse(readFileSync(join(DATA_DIR, season, `ep-${pad(e.number)}`, 'episode.json'), 'utf8')) as Episode,
     );
     episodes.forEach((ep, j) => publishEpisode(season, ep, episodes[j - 1], episodes[j + 1], repo));
+    if (!isPilot(season)) feedItems.push(...episodes.map((ep) => ({ season, ep })));
     for (const ep of episodes)
       for (const id of unknownJudgeIds(ep))
         console.log(`[modelchef] unknown judge id "${id}" in ${season}/ep-${pad(ep.number)}; add it to JUDGES in src/config.ts, or ignore for a retired judge`);
@@ -440,6 +450,8 @@ function main() {
         status += ` <span class="recap-line">${recapHtml(season, last)}</span>`;
         latestLink = ` <a class="latest" href="#${esc(epAnchor(season, last))}">Watch episode ${last.number} &darr;</a>`;
       }
+      const upNext = nextEpisodeLine(last?.date, !!state.champion, new Date().toISOString().slice(0, 10));
+      if (upNext) status += ` <span class="upnext">${esc(upNext)}</span>`;
     }
   }
   // Before the first episode: the roster, with nothing scored yet.
@@ -462,6 +474,10 @@ ${siteFooter(repo)}`;
   const homeMeta = share({ title: 'ModelChef', description: TAGLINE, path: '/' }, homeImage, 1200, 630);
   writeFileSync(join(OUT, 'index.html'), page('ModelChef', body, homeMeta));
   writeFileSync(join(OUT, '.nojekyll'), '');
+  if (FEED) {
+    writeFileSync(join(OUT, 'feed.xml'), atomFeed(SITE_URL, feedItems, new Date()));
+    console.log(`[modelchef] feed: dist/feed.xml (${feedItems.length} episode${feedItems.length === 1 ? '' : 's'})`);
+  } else console.log('[modelchef] feed: skipped (no SITE_URL)');
   console.log(`[modelchef] built ${OUT}/ (${seasons.length} season${seasons.length === 1 ? '' : 's'})`);
 }
 
