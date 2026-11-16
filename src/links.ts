@@ -20,6 +20,11 @@ export function extractLinks(html: string): string[] {
   const out = new Set<string>();
   for (const [tag] of html.matchAll(/<[a-z][^>]*>/gi)) {
     for (const a of tag.matchAll(/\s(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) out.add(decodeEntities(a[1] ?? a[2] ?? ''));
+    // Share tags point at pages and images too.
+    if (/^<meta\b/i.test(tag) && /\s(?:property|name)\s*=\s*["'](?:og:url|og:image|twitter:image)["']/i.test(tag)) {
+      const c = /\scontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
+      if (c) out.add(decodeEntities(c[1] ?? c[2] ?? ''));
+    }
   }
   return [...out];
 }

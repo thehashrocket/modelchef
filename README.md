@@ -31,6 +31,7 @@ A chef whose model is down, or whose reply is not a complete HTML document, forf
    pnpm check-models   # pings each model in the roster
    ```
    It ends with `checked N, passed A, failed B, skipped C` and exits non-zero on any failure or skip; a clean run says `failed 0, skipped 0`. `--allow-skip` accepts models whose key is not set. Fix any `FAIL` lines in `src/config.ts` using IDs from `list-models`. The model IDs in there were a best guess on the day this was written and free tiers rename things constantly.
+   Optional: **`SITE_URL`** (e.g. `https://modelchef.example`) makes share previews use absolute image URLs. Without it, production builds on Vercel use the project's production URL and every other build emits relative-only tags. Set it if you add a custom domain, and set `SITE_URL=` (empty) for Vercel's Preview environment so previews don't advertise production images.
 3. **Add the keys to GitHub** as repository secrets with the same names (Settings → Secrets and variables → Actions). Vercel does not need them.
 4. **Import the repo in Vercel.** `vercel.json` already tells it to run `pnpm build` and serve `dist/`. Vercel rebuilds the site on every push.
 5. **Air the pilot**: Actions → Episode → Run workflow. After that it runs every Saturday on its own: the workflow commits the results, and the push publishes them.
@@ -58,7 +59,7 @@ pnpm build
 
 Before a PR, run `pnpm verify`: unit tests (`pnpm test`), typecheck, and the site built from `data/` and from the fixtures in `test/fixtures/data/`. It needs no keys and no Chromium. CI runs it on every PR.
 
-The capture step needs Chromium: `pnpm exec playwright install chromium`, or set `CHROME_PATH` to a Chrome you already have. `MOCK_FORFEIT=<chef id>` makes one mock chef serve nothing.
+The capture step needs Chromium: `pnpm exec playwright install chromium`, or set `CHROME_PATH` to a Chrome you already have. `MOCK_FORFEIT=<chef id>` makes one mock chef serve nothing. Each episode also renders a share image, `og.jpg`; if that fails the episode still records, and `pnpm backfill-share-images <season>/ep-NN` renders it afterwards (`--help` for options). `SHARE_IMAGE=0` skips it.
 
 ## Tuning
 

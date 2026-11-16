@@ -1,10 +1,28 @@
 // Builds the static leaderboard into dist/. Every string that came out of a
 // model is escaped, and every dish is published behind a network-blocking
 // CSP inside a sandboxed iframe: this site serves JavaScript nobody reviewed.
+import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONTESTANTS, DATA_DIR, JUDGES, SEASON } from './config';
-import { chefName, episodeBlock, epAnchor, epPath, esc, fmtScores, isPilot, pad, recapHtml, SCORE_EXPLAINED, seasonLabel, TYPE_LABEL } from './site-lib';
+import {
+  chefName,
+  episodeBlock,
+  epAnchor,
+  epPath,
+  esc,
+  fmtScores,
+  isPilot,
+  metaTags,
+  pad,
+  recapHtml,
+  recapText,
+  resolveSiteUrl,
+  SCORE_EXPLAINED,
+  seasonLabel,
+  TYPE_LABEL,
+  type MetaInput,
+} from './site-lib';
 import { average, type Episode, type SeasonState } from './state';
 
 const OUT = 'dist';
@@ -114,7 +132,7 @@ header.compact h1 a{color:inherit;text-decoration:none}
 .earlier span{display:block;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
 `;
 
-function page(title: string, body: string): string {
+function page(title: string, body: string, meta = ''): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -122,6 +140,7 @@ function page(title: string, body: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="A weekly cooking competition for language models, where the dishes are single-file web apps and the judges are models too.">
+${meta}
 <style>${STYLE}</style>
 </head>
 <body><div class="wrap">${body}</div></body>
@@ -129,13 +148,14 @@ function page(title: string, body: string): string {
 `;
 }
 
-function playPage(title: string, chef: string, src: string): string {
+function playPage(title: string, chef: string, src: string, meta = ''): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · ModelChef</title>
+${meta}
 <style>
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;font:15px system-ui,sans-serif;background:#15130f;color:#f1ece3}
@@ -243,6 +263,7 @@ function siteFooter(repo: string | undefined): string {
 function episodePage(season: string, ep: Episode, prev: Episode | undefined, next: Episode | undefined, repo: string | undefined): string {
   const root = '../../../';
   const nav = `<nav class="epnav" aria-label="Episodes"><a href="${root}index.html#episodes">&larr; All episodes</a>${prev ? `<a href="${epPage(season, prev, root)}">&larr; Episode ${prev.number}</a>` : ''}${next ? `<a class="next" href="${epPage(season, next, root)}">Episode ${next.number} &rarr;</a>` : ''}</nav>`;
+  const meta = share({ title: `${epTitle(ep)} · ModelChef`, description: recapText(season, ep), path: `/${epPath(season, ep)}/` }, `${epPath(season, ep)}/og.jpg`, 1200, 630);
   return page(
     `${epTitle(ep)} · ModelChef`,
     `${siteHeader({ compact: true, root })}
@@ -250,7 +271,24 @@ ${nav}
 ${episodeBlock(season, ep, root)}
 ${nav}
 ${siteFooter(repo)}`,
+    meta,
   );
+}
+
+/** The site's absolute URL for share tags, resolved once in main(). */
+let SITE_URL = '';
+const imageVersions = new Map<string, string>();
+/**
+ * Share tags for a page. `image` is a path inside dist/; it is used only if the
+ * file is there, and versioned by content so a re-render busts unfurl caches.
+ */
+function share(m: Omit<MetaInput, 'image' | 'width' | 'height'>, image?: string, width?: number, height?: number): string {
+  let img: string | undefined;
+  if (image && existsSync(join(OUT, image))) {
+    if (!imageVersions.has(image)) imageVersions.set(image, createHash('sha256').update(readFileSync(join(OUT, image))).digest('hex').slice(0, 8));
+    img = `/${image}?v=${imageVersions.get(image)}`;
+  }
+  return metaTags({ ...m, image: img, width, height }, SITE_URL);
 }
 
 function publishEpisode(season: string, ep: Episode, prev: Episode | undefined, next: Episode | undefined, repo: string | undefined) {
@@ -259,16 +297,30 @@ function publishEpisode(season: string, ep: Episode, prev: Episode | undefined, 
   mkdirSync(join(out, 'apps'), { recursive: true });
   mkdirSync(join(out, 'pressure'), { recursive: true });
   if (existsSync(join(src, 'shots'))) cpSync(join(src, 'shots'), join(out, 'shots'), { recursive: true });
+  if (existsSync(join(src, 'og.jpg'))) cpSync(join(src, 'og.jpg'), join(out, 'og.jpg'));
 
+  const base = epPath(season, ep);
   for (const e of ep.entries) {
     if (e.forfeit) continue;
     writeFileSync(join(out, 'apps', `${e.contestant}.html`), lockDown(readFileSync(join(src, 'apps', `${e.contestant}.html`), 'utf8')));
-    writeFileSync(join(out, `play-${e.contestant}.html`), playPage(e.title, chefName(e.contestant), `apps/${e.contestant}.html`));
+    const meta = share(
+      { title: `${e.title} by ${chefName(e.contestant)} · ModelChef`, description: e.pitch || `${e.title} by ${chefName(e.contestant)}, Episode ${ep.number} of ModelChef`, path: `/${base}/play-${e.contestant}.html` },
+      `${base}/shots/${e.contestant}-desktop.jpg`,
+      1280,
+      800,
+    );
+    writeFileSync(join(out, `play-${e.contestant}.html`), playPage(e.title, chefName(e.contestant), `apps/${e.contestant}.html`, meta));
   }
   for (const id of ep.pressure?.chefs ?? []) {
     if (ep.pressure!.forfeits[id]) continue;
     writeFileSync(join(out, 'pressure', `${id}.html`), lockDown(readFileSync(join(src, 'pressure', `${id}.html`), 'utf8')));
-    writeFileSync(join(out, `play-pressure-${id}.html`), playPage('Pressure test', chefName(id), `pressure/${id}.html`));
+    const meta = share(
+      { title: `Pressure test: ${chefName(id)} · ModelChef`, description: ep.pressure!.spec, path: `/${base}/play-pressure-${id}.html` },
+      `${base}/shots/pressure-${id}-desktop.jpg`,
+      1280,
+      800,
+    );
+    writeFileSync(join(out, `play-pressure-${id}.html`), playPage('Pressure test', chefName(id), `pressure/${id}.html`, meta));
   }
   // The pilot stays on the home page only.
   if (!isPilot(season)) writeFileSync(join(out, 'index.html'), episodePage(season, ep, prev, next, repo));
@@ -290,9 +342,14 @@ function main() {
     process.exit(1);
   }
 
+  const site = resolveSiteUrl(process.env);
+  SITE_URL = site.url;
+  console.log(`[modelchef] ${site.note}`);
+
   const repo = process.env.GITHUB_REPOSITORY;
   let status = esc(`${seasonLabel(SEASON)} starts Saturday.`);
   let latestLink = '';
+  let homeImage: string | undefined;
   const sections: string[] = [];
   for (const [i, season] of seasons.entries()) {
     const state = JSON.parse(readFileSync(join(DATA_DIR, season, 'state.json'), 'utf8')) as SeasonState;
@@ -311,6 +368,7 @@ function main() {
           ? esc(`${seasonLabel(season)}, ${episodes.length} episode${episodes.length === 1 ? '' : 's'} in. ${left} chefs remain.`)
           : esc(`${seasonLabel(season)} starts Saturday.`);
       if (last) {
+        homeImage = `${epPath(season, last)}/og.jpg`;
         status += ` <span class="recap-line">${recapHtml(season, last)}</span>`;
         latestLink = ` <a class="latest" href="#${esc(epAnchor(season, last))}">Watch episode ${last.number} &darr;</a>`;
       }
@@ -333,7 +391,8 @@ function main() {
 ${sections.join('')}
 ${siteFooter(repo)}`;
 
-  writeFileSync(join(OUT, 'index.html'), page('ModelChef', body));
+  const homeMeta = share({ title: 'ModelChef', description: TAGLINE, path: '/' }, homeImage, 1200, 630);
+  writeFileSync(join(OUT, 'index.html'), page('ModelChef', body, homeMeta));
   writeFileSync(join(OUT, '.nojekyll'), '');
   console.log(`[modelchef] built ${OUT}/ (${seasons.length} season${seasons.length === 1 ? '' : 's'})`);
 }

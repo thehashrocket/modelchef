@@ -4,25 +4,71 @@
 // Every string that came out of a model goes through esc() before it reaches HTML.
 import { CONTESTANTS, JUDGES, SCORING } from './config';
 import { challengeText, RULES } from './prompts';
-import { SAME_FAMILY_REASON, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type MechReport } from './state';
+import { isPilot, SAME_FAMILY_REASON, seasonLabel, TYPE_LABEL, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type MechReport } from './state';
 
 export const esc = (s: unknown) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 export const chefName = (id: string) => CONTESTANTS.find((c) => c.id === id)?.name ?? id;
 export const judgeName = (id: string) => JUDGES.find((j) => j.id === id)?.name ?? id;
 export const pad = (n: number) => String(n).padStart(2, '0');
-/** A folder named "pilot" is a trial run: shown on the site, never counted. */
-export const isPilot = (season: string) => season === 'pilot';
-export const seasonLabel = (season: string) => {
-  if (isPilot(season)) return 'Pilot';
-  const m = /^season-0*(\d+)$/.exec(season);
-  return m ? `Season ${m[1]}` : season;
-};
+export { isPilot, seasonLabel, TYPE_LABEL };
 export const fmtDate = (iso: string) => {
   const d = new Date(`${iso}T12:00:00Z`);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 };
-export const TYPE_LABEL = { 'mystery-box': 'Mystery Box', invention: 'Invention Test', finale: 'Finale' } as const;
+
+/** og:image and friends. Absolute URLs only when the site's URL is known; unfurlers ignore relative ones. */
+export interface MetaInput {
+  title: string;
+  description: string;
+  /** Site path with a leading slash, e.g. "/s/season-01/ep-01/". */
+  path: string;
+  /** Site path of the image with a leading slash, already versioned if wanted. */
+  image?: string;
+  width?: number;
+  height?: number;
+}
+
+export function metaTags(m: MetaInput, siteUrl: string): string {
+  const tag = (attr: 'property' | 'name', key: string, value: string | number) => `<meta ${attr}="${key}" content="${esc(value)}">`;
+  const out = [
+    tag('property', 'og:title', m.title),
+    tag('property', 'og:description', m.description),
+    tag('property', 'og:type', 'website'),
+    tag('property', 'og:site_name', 'ModelChef'),
+    tag('name', 'twitter:card', 'summary_large_image'),
+    tag('name', 'twitter:title', m.title),
+    tag('name', 'twitter:description', m.description),
+  ];
+  if (siteUrl) {
+    out.push(tag('property', 'og:url', siteUrl + m.path));
+    if (m.image) {
+      out.push(tag('property', 'og:image', siteUrl + m.image));
+      if (m.width && m.height) out.push(tag('property', 'og:image:width', m.width), tag('property', 'og:image:height', m.height));
+      out.push(tag('name', 'twitter:image', siteUrl + m.image));
+    }
+  }
+  return out.join('\n');
+}
+
+/**
+ * The site's absolute URL for share tags: SITE_URL if set (empty disables it),
+ * else Vercel's production URL on production builds only. A malformed value
+ * warns and is ignored: a cosmetic tag must never fail a deploy.
+ */
+export function resolveSiteUrl(env: Record<string, string | undefined>): { url: string; note: string } {
+  if (env.SITE_URL !== undefined) {
+    const v = env.SITE_URL.trim().replace(/\/+$/, '');
+    if (!v) return { url: '', note: 'share tags: relative only (SITE_URL is empty)' };
+    if (!/^https?:\/\/[^/]/.test(v)) return { url: '', note: `warning: SITE_URL must start with https:// (got "${env.SITE_URL}"); building without absolute share tags` };
+    return { url: v, note: `share tags: absolute via SITE_URL=${v}` };
+  }
+  if (env.VERCEL_ENV === 'production' && env.VERCEL_PROJECT_PRODUCTION_URL) {
+    const v = `https://${env.VERCEL_PROJECT_PRODUCTION_URL.replace(/\/+$/, '')}`;
+    return { url: v, note: `share tags: absolute via VERCEL_PROJECT_PRODUCTION_URL=${v}` };
+  }
+  return { url: '', note: 'share tags: relative only (SITE_URL unset)' };
+}
 /** Where an episode's files live, relative to the site root. */
 export const epPath = (season: string, ep: Episode) => `s/${season}/ep-${pad(ep.number)}`;
 export const epAnchor = (season: string, ep: Episode) => `${season}-ep-${pad(ep.number)}`;

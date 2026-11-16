@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { card, featuredCard, fmtScores, mechLine, mechProblems, recapText, tieTitle } from './site-lib';
+import { card, featuredCard, fmtScores, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
 import type { DuelVote, Entry, Episode, PressureTest } from './state';
 
 const entry = (contestant: string, total: number, over: Partial<Entry> = {}): Entry => ({
@@ -197,5 +197,44 @@ describe('fmtScores', () => {
   });
   it('ignores float noise and true equals', () => {
     assert.equal(fmtScores([0.1 + 0.2, 0.3, 4])(0.3), '0.3');
+  });
+});
+
+describe('metaTags', () => {
+  const m = { title: 'Mise by Gemini', description: 'A pitch.', path: '/s/season-01/ep-01/', image: '/s/season-01/ep-01/og.jpg?v=abcd1234', width: 1200, height: 630 };
+  it('emits no absolute tags without a site URL, and no relative image URLs', () => {
+    const html = metaTags(m, '');
+    assert.match(html, /og:title" content="Mise by Gemini"/);
+    assert.match(html, /twitter:card" content="summary_large_image"/);
+    assert.ok(!/og:image|og:url|twitter:image/.test(html));
+  });
+  it('emits absolute og:url, og:image with size, and twitter:image with a site URL', () => {
+    const html = metaTags(m, 'https://modelchef.example');
+    assert.match(html, /og:url" content="https:\/\/modelchef\.example\/s\/season-01\/ep-01\/"/);
+    assert.match(html, /og:image" content="https:\/\/modelchef\.example\/s\/season-01\/ep-01\/og\.jpg\?v=abcd1234"/);
+    assert.match(html, /og:image:width" content="1200"/);
+    assert.match(html, /og:image:height" content="630"/);
+    assert.match(html, /twitter:image" content="https:\/\/modelchef\.example\/s\/season-01\/ep-01\/og\.jpg/);
+  });
+  it('escapes model text', () => {
+    const html = metaTags({ ...m, title: `"><script>x</script>'&`, description: `"><script>x</script>'&` }, 'https://a.example');
+    assert.ok(!html.includes('<script'));
+    assert.ok(!html.includes(`"><`));
+  });
+});
+
+describe('resolveSiteUrl', () => {
+  it('is relative-only when unset', () => assert.equal(resolveSiteUrl({}).url, ''));
+  it('trims a trailing slash', () => assert.equal(resolveSiteUrl({ SITE_URL: 'https://a.example/' }).url, 'https://a.example'));
+  it('an empty SITE_URL disables absolute tags, even on Vercel production', () =>
+    assert.equal(resolveSiteUrl({ SITE_URL: '', VERCEL_ENV: 'production', VERCEL_PROJECT_PRODUCTION_URL: 'x.vercel.app' }).url, ''));
+  it('warns and ignores a malformed value instead of failing', () => {
+    const r = resolveSiteUrl({ SITE_URL: 'modelchef.app' });
+    assert.equal(r.url, '');
+    assert.match(r.note, /^warning: SITE_URL must start with https:\/\/ \(got "modelchef\.app"\)/);
+  });
+  it('uses the Vercel production URL only on production builds', () => {
+    assert.equal(resolveSiteUrl({ VERCEL_ENV: 'production', VERCEL_PROJECT_PRODUCTION_URL: 'x.vercel.app' }).url, 'https://x.vercel.app');
+    assert.equal(resolveSiteUrl({ VERCEL_ENV: 'preview', VERCEL_PROJECT_PRODUCTION_URL: 'x.vercel.app' }).url, '');
   });
 });

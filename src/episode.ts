@@ -2,10 +2,11 @@
 // and machine-checked, the judges score them blind, the bottom two face a
 // pressure test, and one chef goes home. Nothing is recorded unless the whole
 // episode completes, so a failed run can simply be run again.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Browser } from 'playwright';
 import { capture } from './capture';
+import { renderShareImage, shareCardFor } from './share-image';
 import {
   CONTESTANTS,
   GUEST_JUDGE,
@@ -219,6 +220,29 @@ async function pressureTest(
   return { ...result, eliminated: up > low ? lower.id : upper.id, decidedBy: 'votes' };
 }
 
+/**
+ * The episode's share image. Never fails the episode: on any error it says how
+ * to backfill the image once the episode is recorded. SHARE_IMAGE=0 skips it.
+ */
+async function shareImage(browser: Browser, dir: string, season: string, n: number, type: EpisodeType, theme: string | null, winner: Entry) {
+  const out = join(dir, 'og.jpg');
+  // A re-run must never publish a stale image from an earlier attempt.
+  rmSync(out, { force: true });
+  rmSync(`${out}.tmp`, { force: true });
+  if (process.env.SHARE_IMAGE === '0') {
+    log('  Share image skipped (SHARE_IMAGE=0).');
+    return;
+  }
+  try {
+    await renderShareImage(browser, out, shareCardFor(season, { number: n, type, theme }, winner, dir));
+    log('  Share image: og.jpg');
+  } catch (err) {
+    const msg = `share image failed for ${dir}: ${(err as Error).message.split('\n')[0]!.replace(/\.$/, '')}. The episode continues. After it is recorded, run pnpm backfill-share-images ${season}/ep-${String(n).padStart(2, '0')} and commit ${join(dir, 'og.jpg')}.`;
+    console.error(`[modelchef] ${msg}`);
+    if (process.env.GITHUB_ACTIONS) console.log(`::warning::${msg}`);
+  }
+}
+
 /** What the judges know about the season so far: only what actually happened on the show. */
 function showContext(state: SeasonState, n: number): ShowContext {
   const histories = Object.values(state.contestants).flatMap((c) => c.history);
@@ -343,6 +367,8 @@ async function main() {
       log(`  Pressure test: ${chefs[0].id} vs ${chefs[1].id}`);
       pressure = await pressureTest(browser, dir, chefs, show);
     }
+
+    await shareImage(browser, dir, state.season, n, type, theme, entries[0]!);
   } finally {
     await browser.close();
   }
