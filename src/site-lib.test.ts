@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { card, dishChrome, featuredCard, fmtScores, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
-import type { DuelVote, Entry, Episode, PressureTest } from './state';
+import { abstentionKind, card, dishChrome, featuredCard, fmtScores, judgeChips, judgeClass, judgeCss, panelJudges, unknownJudgeIds, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
+import { GUEST_UNEVEN_REASON, SAME_FAMILY_REASON, type DuelVote, type Entry, type Episode, type PressureTest } from './state';
 
 const entry = (contestant: string, total: number, over: Partial<Entry> = {}): Entry => ({
   contestant,
@@ -268,5 +268,58 @@ describe('dishChrome', () => {
     const e = { ...ep.entries[0]!, title: `"><script>x</script>'&`, pitch: `"><script>x</script>'&` };
     const { bar, panel } = dishChrome('season-01', ep, { entry: e, prev: { href: 'p.html', label: `"><script>` } });
     assert.ok(!(bar + panel).includes('<script'));
+  });
+});
+
+describe('judge identity', () => {
+  const scored = (judge: string, judgeName: string): Entry['judges'][number] => ({ judge, judgeName, lens: 'craft', scores: { usefulness: 7, craft: 7, originality: 7, theme: 7 }, weighted: 7, critique: 'c', improve: 'i' });
+  const withPanel = (abstained: Entry['abstained']) => {
+    const ep = episode(null);
+    const e = { ...ep.entries[0]!, judges: [scored('pragmatist', 'The Pragmatist'), scored('craftsman', 'The Craftsman')], abstained };
+    return judgeChips(ep, e);
+  };
+
+  it('same family: "sat out" with a plain explanation, no number', () => {
+    const html = withPanel([{ judge: 'maverick', reason: SAME_FAMILY_REASON }]);
+    assert.match(html, /class="chip out" title="Same lab as this chef, so this judge sat the dish out\.">.*Maverick · sat out<\/span>/);
+  });
+  it('older records with the legacy wording still read as "sat out"', () => {
+    assert.equal(abstentionKind('Same model family as the chef.'), 'sat-out');
+    assert.equal(abstentionKind('Abstained: same model family as one of the chefs.'), 'sat-out');
+  });
+  it('an unreadable reply: "no score", and the raw error stays out of the chip', () => {
+    const html = withPanel([{ judge: 'maverick', reason: 'Unavailable: Unexpected non-whitespace character after JSON at position 382' }]);
+    assert.match(html, /Maverick · no score<\/span>/);
+    assert.ok(!html.includes('Unexpected'));
+  });
+  it('the uneven guest rule: "not counted"', () => {
+    assert.equal(abstentionKind(GUEST_UNEVEN_REASON, GUEST_UNEVEN_REASON), 'not-counted');
+  });
+  it('one chip per panel judge', () => {
+    const html = withPanel([{ judge: 'maverick', reason: SAME_FAMILY_REASON }]);
+    assert.equal((html.match(/class="chip/g) ?? []).length, 3);
+  });
+  it('an unknown judge id gets a neutral monogram and its recorded name, never a crash', () => {
+    const ep = episode(null);
+    const e = { ...ep.entries[0]!, judges: [scored('retired', 'The Retired Judge')] };
+    const html = judgeChips(ep, e);
+    assert.match(html, /<span class="mono j-unknown" aria-hidden="true">R<\/span>Retired Judge <b>7\.0<\/b>/);
+    assert.deepEqual(unknownJudgeIds({ ...ep, entries: [e] }), ['retired']);
+  });
+  it('the guest chip names the guest from the record and marks it', () => {
+    const ep = episode(null);
+    const e = { ...ep.entries[0]!, judges: [scored('guest', 'Someone Recorded')] };
+    assert.match(judgeChips(ep, e), /Someone Recorded <span class="gm">Guest<\/span> <b>7\.0<\/b>/);
+  });
+  it('builds colour variables for the panel, with or without a guest', () => {
+    const withGuest = judgeCss();
+    assert.match(withGuest, /\.j-pragmatist\{--j:#0369a1\}/);
+    assert.match(withGuest, /\.j-guest\{--j:/);
+    const noGuest = judgeCss(panelJudges(null));
+    assert.ok(!noGuest.includes('j-guest'));
+    assert.match(noGuest, /@media \(prefers-color-scheme:dark\)\{\.j-pragmatist\{--j:#7dd3fc\}/);
+  });
+  it('sanitises ids into class names', () => {
+    assert.equal(judgeClass('The "Odd" Judge!'), 'j-theoddjudge');
   });
 });

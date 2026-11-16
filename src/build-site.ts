@@ -14,7 +14,10 @@ import {
   esc,
   fmtScores,
   isPilot,
+  judgeCss,
   metaTags,
+  monogram,
+  unknownJudgeIds,
   pad,
   recapHtml,
   recapText,
@@ -46,8 +49,14 @@ const BASE_STYLE = `
 *{box-sizing:border-box}
 a{color:var(--accent)}
 .jrow{display:flex;flex-wrap:wrap;gap:6px;font-size:.8rem;font-variant-numeric:tabular-nums}
-.jrow span{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted)}
+.jrow .chip{display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 7px 1px 3px;color:var(--muted)}
+.jrow .chip.out{border-style:dashed;background:none}
 .jrow b{color:var(--ink);font-weight:600}
+.mono{display:inline-grid;place-items:center;width:1.25em;height:1.25em;border-radius:50%;background:var(--j);color:#fff;font:700 .75em/1 system-ui,sans-serif;margin-right:4px;vertical-align:-.15em;flex-shrink:0}
+.j-unknown{--j:var(--muted)}
+.gm{font-size:.85em;border:1px solid var(--muted);border-radius:4px;padding:0 4px;margin-left:2px;color:var(--ink)}
+@media (prefers-color-scheme:dark){.mono{color:#15130f}}
+${judgeCss()}
 .badges{display:flex;flex-wrap:wrap;gap:6px}
 .badge{white-space:nowrap;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
 .badge.win{color:var(--good);border-color:currentColor}
@@ -63,6 +72,7 @@ a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid var
 blockquote{margin:10px 0 0;padding-left:12px;border-left:3px solid var(--line)}
 blockquote b{display:block}
 blockquote small{color:var(--muted)}
+blockquote .why{display:block}
 .prov{display:block;color:var(--muted);font-size:.78rem}
 .notes h4{margin:6px 0 0;font-size:.92rem;color:var(--muted)}
 `;
@@ -101,6 +111,11 @@ tr.out td{color:var(--muted)}
 .says p{margin:8px 0 0;color:var(--muted);font-style:italic}
 .panel{color:var(--muted);font-size:.92rem;margin:10px 0 0;max-width:72ch}
 .panel b{color:var(--ink)}
+.judges{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:10px}
+.judges li{padding-left:1.9em;text-indent:-1.9em}
+.judges .mono{text-indent:0;width:1.5em;height:1.5em;margin-right:.4em}
+.lens{color:var(--muted);font-size:.85em;text-transform:uppercase;letter-spacing:.04em}
+.panel p{margin:8px 0 0}
 .latest{font-weight:600}
 .play{margin-top:auto;font-weight:700}
 .recap{font-size:1.05rem;color:var(--ink);max-width:70ch;margin:0 0 18px;overflow-wrap:anywhere}
@@ -281,7 +296,10 @@ function siteHeader(opts: { compact: boolean; root: string; status?: string; lat
 <h1>Model<span>Chef</span></h1>
 <p class="tag">A weekly cooking competition for language models. Every chef gets the same brief and one shot at a single-file web app. Three model judges score the dishes blind, the bottom two face a pressure test, and one chef goes home. Nothing is edited by a human.</p>
 <p class="status">${opts.status ?? ''}${opts.latestLink ?? ''}</p>
-<p class="panel" id="judges"><b>The panel:</b> ${JUDGES.map((j) => `${esc(j.name)} (${j.lens === 'overall' ? 'the whole plate' : esc(j.lens)})`).join(', ')}. Each judge's own specialty counts double in their score, and the machine check covers the house rules.</p>
+<details class="panel" id="judges"><summary>Meet the judges</summary>
+<ul class="judges">${JUDGES.map((j) => `<li>${monogram(j.id)}<b>${esc(j.name)}</b> <span class="lens">${j.lens === 'overall' ? 'the whole plate' : esc(j.lens)}</span><br>${esc(j.bio)}</li>`).join('')}</ul>
+<p>Each judge's own specialty counts double in their score.</p>
+</details>
 </header>`;
 }
 
@@ -400,6 +418,9 @@ function main() {
       (e) => JSON.parse(readFileSync(join(DATA_DIR, season, `ep-${pad(e.number)}`, 'episode.json'), 'utf8')) as Episode,
     );
     episodes.forEach((ep, j) => publishEpisode(season, ep, episodes[j - 1], episodes[j + 1], repo));
+    for (const ep of episodes)
+      for (const id of unknownJudgeIds(ep))
+        console.log(`[modelchef] unknown judge id "${id}" in ${season}/ep-${pad(ep.number)}; add it to JUDGES in src/config.ts, or ignore for a retired judge`);
     const newest = i === 0 && !isPilot(season);
     sections.push(seasonSection(season, state, episodes, newest));
     if (newest) {
