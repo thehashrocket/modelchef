@@ -2,14 +2,57 @@
 // import time, so tests can import these directly. build-site.ts does the I/O.
 //
 // Every string that came out of a model goes through esc() before it reaches HTML.
-import { CONTESTANTS, JUDGES, SCORING } from './config';
+import { CONTESTANTS, GUEST_JUDGE, JUDGES, SCORING, type Judge } from './config';
 import { challengeText, RULES } from './prompts';
-import { isPilot, SAME_FAMILY_REASON, seasonLabel, TYPE_LABEL, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type MechReport } from './state';
+import { GUEST_UNEVEN_REASON, isPilot, SAME_FAMILY_REASON, seasonLabel, TYPE_LABEL, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type MechReport } from './state';
 
 export const esc = (s: unknown) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 export const chefName = (id: string) => CONTESTANTS.find((c) => c.id === id)?.name ?? id;
-export const judgeName = (id: string) => JUDGES.find((j) => j.id === id)?.name ?? id;
+export const judgeName = (id: string) => JUDGES.find((j) => j.id === id)?.name ?? (GUEST_JUDGE?.id === id ? GUEST_JUDGE.name : id);
+
+// ---------------------------------------------------------------------------
+// Judge identity: a colour and a monogram from config. Names always come from
+// the episode record, so retiring or renaming a judge never rewrites history.
+
+/** Every judge with a seat: the regular panel, plus the finale guest when there is one. */
+export const panelJudges = (guest: Judge | null = GUEST_JUDGE): Judge[] => [...JUDGES, ...(guest ? [guest] : [])];
+export const judgeClass = (id: string) => `j-${id.toLowerCase().replace(/[^a-z0-9-]/g, '')}`;
+const judgeConfig = (id: string) => panelJudges().find((j) => j.id === id);
+
+/** Per-judge colour variables for STYLE, light and dark. Unknown ids fall back to --muted. */
+export function judgeCss(judges: Judge[] = panelJudges()): string {
+  const light = judges.map((j) => `.${judgeClass(j.id)}{--j:${j.color.light}}`).join('');
+  const dark = judges.map((j) => `.${judgeClass(j.id)}{--j:${j.color.dark}}`).join('');
+  return `${light}\n@media (prefers-color-scheme:dark){${dark}}`;
+}
+
+/** A decorative circle with the judge's initial. The name text always sits beside it. */
+export function monogram(judgeId: string, fallbackName = ''): string {
+  const cfg = judgeConfig(judgeId);
+  const letter = (cfg?.short ?? fallbackName.replace(/^The /, '') ?? judgeId).charAt(0).toUpperCase() || '?';
+  return `<span class="mono ${cfg ? judgeClass(judgeId) : 'j-unknown'}" aria-hidden="true">${esc(letter)}</span>`;
+}
+
+/** The name to show for a judge: the record's, then config's, then the raw id. */
+const shownName = (judge: string, recorded?: string) => recorded ?? judgeName(judge);
+const shortOf = (judge: string, name: string) => (judge === GUEST_JUDGE?.id ? name : (judgeConfig(judge)?.short ?? name.replace(/^The /, '')));
+
+/** Ids in a record that config no longer knows (a retired judge, or a typo). */
+export function unknownJudgeIds(ep: Episode): string[] {
+  const ids = new Set([...ep.entries.flatMap((e) => [...e.judges.map((j) => j.judge), ...e.abstained.map((a) => a.judge)]), ...(ep.pressure?.votes.map((v) => v.judge) ?? [])]);
+  return [...ids].filter((id) => !judgeConfig(id) && id !== 'guest');
+}
+
+export type ChipKind = 'scored' | 'sat-out' | 'no-score' | 'not-counted';
+export const SAT_OUT_TITLE = 'Same lab as this chef, so this judge sat the dish out.';
+export const NO_SCORE_TITLE = "This judge's reply couldn't be read, so the dish was scored by the others.";
+/** Why a judge has no number on a dish, from the abstention's reason. */
+export function abstentionKind(reason: string, guestUnevenReason?: string): Exclude<ChipKind, 'scored'> {
+  if (isSameFamily(reason)) return 'sat-out';
+  if (guestUnevenReason && reason === guestUnevenReason) return 'not-counted';
+  return 'no-score';
+}
 export const pad = (n: number) => String(n).padStart(2, '0');
 export { isPilot, seasonLabel, TYPE_LABEL };
 export const fmtDate = (iso: string) => {
@@ -221,11 +264,26 @@ export function mechLine(m: MechReport | null, ep: Episode): string {
   return `<div class="mech bad"><span aria-hidden="true">⚠</span> Machine check <b>${m.score}/10</b>: <span class="problems">${problems.join(' · ')}</span>${size}${ingredient}</div>`;
 }
 
-const shortName = (name: string) => name.replace(/^The /, '');
+const isGuestId = (judge: string) => judge === GUEST_JUDGE?.id || judge === 'guest';
+const guestMark = (judge: string) => (isGuestId(judge) ? ' <span class="gm">Guest</span>' : '');
+/** How each kind of missing judge reads: on the chip, and in plain words beside the raw reason. A null title uses the reason itself. */
+const ABSENCE: Record<Exclude<ChipKind, 'scored'>, { label: string; title: string | null }> = {
+  'sat-out': { label: 'sat out', title: SAT_OUT_TITLE },
+  'no-score': { label: 'no score', title: NO_SCORE_TITLE },
+  'not-counted': { label: 'not counted', title: null },
+};
 
+/** One chip per panel judge: a score, "sat out", or "no score". Raw error text never goes in a chip. */
 export function judgeChips(_ep: Episode, e: Entry): string {
   if (!e.judges.length) return '';
-  return `<div class="jrow" aria-label="Judge scores">${e.judges.map((j) => `<span>${esc(shortName(j.judgeName))} <b>${j.weighted.toFixed(1)}</b></span>`).join('')}</div>`;
+  const scored = e.judges.map((j) => `<span class="chip">${monogram(j.judge, j.judgeName)}${esc(shortOf(j.judge, j.judgeName))}${guestMark(j.judge)} <b>${j.weighted.toFixed(1)}</b></span>`);
+  const missing = e.abstained.map((a) => {
+    // The guest's missing chip says just "Guest"; regular judges use their short name.
+    const name = isGuestId(a.judge) ? 'Guest' : shortOf(a.judge, shownName(a.judge, a.judgeName));
+    const { label, title } = ABSENCE[abstentionKind(a.reason, GUEST_UNEVEN_REASON)];
+    return `<span class="chip out" title="${esc(title ?? a.reason)}">${monogram(a.judge, name)}${esc(name)} · ${label}</span>`;
+  });
+  return `<div class="jrow" aria-label="Judge scores">${[...scored, ...missing].join('')}</div>`;
 }
 
 /** The judges' critiques. `open` renders them bare instead of inside a closed disclosure. */
@@ -235,10 +293,16 @@ export function notesBlock(ep: Episode, e: Entry, open: boolean): string {
     e.judges
       .map(
         (j) =>
-          `<blockquote><b>${esc(j.judgeName)} · ${j.weighted.toFixed(1)}</b>${esc(j.critique)}<br><small>Use ${j.scores.usefulness} · Craft ${j.scores.craft} · Originality ${j.scores.originality} · Theme ${j.scores.theme}</small>${provenance(ep, j)}</blockquote>`,
+          `<blockquote><b>${monogram(j.judge, j.judgeName)}${esc(j.judgeName)} · ${j.weighted.toFixed(1)}</b>${esc(j.critique)}<br><small>Use ${j.scores.usefulness} · Craft ${j.scores.craft} · Originality ${j.scores.originality} · Theme ${j.scores.theme}</small>${provenance(ep, j)}</blockquote>`,
       )
       .join('') +
-    e.abstained.map((a) => `<blockquote><b>${esc(a.judgeName ?? judgeName(a.judge))} abstained</b><small>${esc(a.reason)}</small>${provenance(ep, a)}</blockquote>`).join('');
+    e.abstained
+      .map((a) => {
+        const name = shownName(a.judge, a.judgeName);
+        const plain = ABSENCE[abstentionKind(a.reason, GUEST_UNEVEN_REASON)].title;
+        return `<blockquote><b>${monogram(a.judge, name)}${esc(name)} abstained</b>${plain ? `<span class="why">${esc(plain)}</span>` : ''}<small>${esc(a.reason)}</small>${provenance(ep, a)}</blockquote>`;
+      })
+      .join('');
   return open ? `<div class="notes"><h4>Judges' notes</h4>${quotes}</div>` : `<details><summary>Judges' notes</summary>${quotes}</details>`;
 }
 
@@ -298,6 +362,11 @@ ${judgeChips(ep, e)}${mechLine(e.mech, ep)}
 </div></article>`;
 }
 
+/** One judge's pressure-test vote, with chef names in place of "Dish A/B" and the model behind it. */
+function voteItem(ep: Episode, v: DuelVote): string {
+  return `<li><b>${monogram(v.judge, v.judgeName)}${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${nameDishes(v.reason, v.order)}${provenance(ep, v)}</li>`;
+}
+
 export function pressureBlock(season: string, ep: Episode, root = ''): string {
   const p = ep.pressure;
   if (!p) return '';
@@ -310,7 +379,7 @@ export function pressureBlock(season: string, ep: Episode, root = ''): string {
     .map((id) => (p.forfeits[id] ? `${esc(chefName(id))} (no dish)` : `<a href="${base}/play-pressure-${id}.html">${esc(chefName(id))}</a>`))
     .join(' vs ');
   const votes = p.votes
-    .map((v) => `<li><b>${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${nameDishes(v.reason, v.order)}${provenance(ep, v)}</li>`)
+    .map((v) => voteItem(ep, v))
     .join('');
   return `<div class="pressure" id="${epAnchor(season, ep)}-pressure"><h3>Pressure test</h3>
 <p>${dishes}</p>
@@ -390,7 +459,7 @@ ${footer}`;
   const nav = opts.other ? `<a href="${opts.other.href}">Other dish: ${esc(opts.other.label)} &rsaquo;</a>` : '';
   const bar = `<header class="bar">${back}<b class="t">Pressure test</b><span class="r2"><span class="m">by ${esc(chef)}</span><span class="pn">${nav}</span></span>${verdict}</header>`;
   const votes = p.votes
-    .map((v) => `<li><b>${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${nameDishes(v.reason, v.order)}${provenance(ep, v)}</li>`)
+    .map((v) => voteItem(ep, v))
     .join('');
   const panel = `<p><b>The spec:</b> ${esc(p.spec)}</p>
 <p>Picked by ${picks} of ${p.votes.length} judge${p.votes.length === 1 ? '' : 's'}.</p>

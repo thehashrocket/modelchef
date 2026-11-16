@@ -81,6 +81,8 @@ export interface Abstention {
 
 /** Why a judge sits out a dish from its own lab. The site recognises this text. */
 export const SAME_FAMILY_REASON = 'Same model family as the chef.';
+/** Why neither finalist's guest score counts when the guest could score only one of them. */
+export const GUEST_UNEVEN_REASON = 'Guest judge could not score both finalists, so neither guest score counts.';
 
 export interface DuelVote {
   judge: string;

@@ -50,6 +50,13 @@ export interface Judge {
   /** How much of the source the judge reads. Lower it for small TPM limits. */
   sourceChars: number;
   models: ModelRef[];
+  // Display only: the site uses these, the prompts never do.
+  /** Short name for chips, e.g. "Pragmatist". */
+  short: string;
+  /** Badge colour for the light and dark themes. Must pass 4.5:1 against the card background in each. */
+  color: { light: string; dark: string };
+  /** One public sentence about this judge for the site. Not sent to any model. */
+  bio: string;
 }
 
 export const SEASON = 'season-01';
@@ -119,6 +126,9 @@ export const JUDGES: Judge[] = [
       { provider: 'openrouter', model: 'inclusionai/ling-3.2-flash:free' },
       { provider: 'openrouter', model: 'dots-studio/dots-3-note-preview:free' },
     ],
+    short: 'Pragmatist',
+    color: { light: '#0369a1', dark: '#7dd3fc' },
+    bio: 'Runs a small business. Asks one question of every dish: would anyone open this twice?',
   },
   {
     id: 'craftsman',
@@ -131,6 +141,9 @@ export const JUDGES: Judge[] = [
     sourceChars: 80000,
     // The one paid seat on the panel. Judging is mostly reading, so it is cheap.
     models: [{ provider: 'xai', model: 'grok-4.5' }],
+    short: 'Craftsman',
+    color: { light: '#4338ca', dark: '#a5b4fc' },
+    bio: 'Veteran front-end engineer. Notices spacing, contrast, focus states and what happens at phone width.',
   },
   {
     id: 'maverick',
@@ -146,6 +159,9 @@ export const JUDGES: Judge[] = [
       { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
       { provider: 'openrouter', model: 'nvidia/nemotron-3.5-lightning:free' },
     ],
+    short: 'Maverick',
+    color: { light: '#a21caf', dark: '#f0abfc' },
+    bio: 'Has seen ten thousand to-do lists. Rewards the dish nobody else would have made.',
   },
 ];
 
@@ -172,6 +188,9 @@ export const GUEST_JUDGE: Judge | null = {
   // A fixed version on purpose: the "-latest" aliases change underneath you,
   // and the ":batch" variants do not answer in real time.
   models: [{ provider: 'openrouter', model: 'anthropic/claude-opus-5.5' }],
+  short: 'Guest',
+  color: { light: '#57534e', dark: '#d6d3d1' },
+  bio: 'Guest judge for the finale. Sets the brief, then judges the whole plate.',
 };
 
 export interface SecretIngredient {
