@@ -1,0 +1,532 @@
+{
+  "season": "season-01",
+  "contestants": {
+    "gemini-flash": {
+      "status": "champion",
+      "eliminatedIn": null,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Kettle Deck",
+          "pitch": "A mock dish from gemini-flash that counts clicks.",
+          "rank": 1,
+          "of": 6,
+          "total": 7.546666666666667,
+          "outcome": "won",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "Prism Deck",
+          "pitch": "A mock dish from gemini-flash that counts clicks.",
+          "rank": 3,
+          "of": 5,
+          "total": 7.2266666666666675,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 3,
+          "type": "mystery-box",
+          "theme": "Mock theme about atlass",
+          "title": "SupercalifragilisticexpialidociousKitchenmultitoolorganiserexpeditorplannerBoard",
+          "pitch": "A mock dish from gemini-flash that counts clicks.",
+          "rank": 1,
+          "of": 4,
+          "total": 7.053333333333334,
+          "outcome": "won",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 4,
+          "type": "finale",
+          "theme": "Mock finale brief about orbits",
+          "title": "Orbit Board",
+          "pitch": "A mock dish from gemini-flash that counts clicks.",
+          "rank": 1,
+          "of": 2,
+          "total": 7.6000000000000005,
+          "outcome": "won",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        }
+      ]
+    },
+    "gemma": {
+      "status": "eliminated",
+      "eliminatedIn": 3,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Ledger Lab",
+          "pitch": "A mock dish from gemma that counts clicks.",
+          "rank": 3,
+          "of": 6,
+          "total": 7.333333333333334,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "Ledger Pad",
+          "pitch": "A mock dish from gemma that counts clicks.",
+          "rank": 4,
+          "of": 5,
+          "total": 7.12,
+          "outcome": "survived the pressure test",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 3,
+          "type": "mystery-box",
+          "theme": "Mock theme about atlass",
+          "title": "Ember Deck",
+          "pitch": "A mock dish from gemma that counts clicks.",
+          "rank": 2,
+          "of": 4,
+          "total": 6.946666666666667,
+          "outcome": "survived the pressure test",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        }
+      ]
+    },
+    "gpt-oss": {
+      "status": "eliminated",
+      "eliminatedIn": 3,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Ember Pad",
+          "pitch": "A mock dish from gpt-oss that counts clicks.",
+          "rank": 6,
+          "of": 6,
+          "total": 6.48,
+          "outcome": "survived the pressure test",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "Orbit Pad",
+          "pitch": "A mock dish from gpt-oss that counts clicks.",
+          "rank": 2,
+          "of": 5,
+          "total": 7.44,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 3,
+          "type": "mystery-box",
+          "theme": "Mock theme about atlass",
+          "title": "No dish",
+          "pitch": "Forfeited. The reply did not contain a complete HTML document (stop reason: stop, 30 characters).",
+          "rank": 4,
+          "of": 4,
+          "total": 0,
+          "outcome": "eliminated",
+          "feedback": []
+        }
+      ]
+    },
+    "ernie": {
+      "status": "eliminated",
+      "eliminatedIn": 1,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Tide Board",
+          "pitch": "A mock dish from ernie that counts clicks.",
+          "rank": 5,
+          "of": 6,
+          "total": 6.493333333333334,
+          "outcome": "eliminated",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        }
+      ]
+    },
+    "nemotron": {
+      "status": "eliminated",
+      "eliminatedIn": 2,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Atlas Board",
+          "pitch": "A mock dish from nemotron that counts clicks.",
+          "rank": 4,
+          "of": 6,
+          "total": 6.800000000000001,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "Prism Pad",
+          "pitch": "A mock dish from nemotron that counts clicks.",
+          "rank": 5,
+          "of": 5,
+          "total": 6.88,
+          "outcome": "eliminated",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        }
+      ]
+    },
+    "cohere-north": {
+      "status": "eliminated",
+      "eliminatedIn": 4,
+      "history": [
+        {
+          "episode": 1,
+          "type": "mystery-box",
+          "theme": "Something for a kitchen",
+          "title": "Atlas Lab",
+          "pitch": "A mock dish from cohere-north that counts clicks.",
+          "rank": 2,
+          "of": 6,
+          "total": 7.440000000000001,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "Ember Board",
+          "pitch": "A mock dish from cohere-north that counts clicks.",
+          "rank": 1,
+          "of": 5,
+          "total": 7.813333333333333,
+          "outcome": "won",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 3,
+          "type": "mystery-box",
+          "theme": "Mock theme about atlass",
+          "title": "Ember Board",
+          "pitch": "A mock dish from cohere-north that counts clicks.",
+          "rank": 3,
+          "of": 4,
+          "total": 6.253333333333335,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        },
+        {
+          "episode": 4,
+          "type": "finale",
+          "theme": "Mock finale brief about orbits",
+          "title": "Kettle Lab",
+          "pitch": "A mock dish from cohere-north that counts clicks.",
+          "rank": 2,
+          "of": 2,
+          "total": 7.066666666666666,
+          "outcome": "eliminated",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+              "improve": "Mock suggestion: give the user a reason to click."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "episodes": [
+    {
+      "number": 1,
+      "date": "2026-01-03",
+      "type": "mystery-box",
+      "theme": "Something for a kitchen",
+      "ingredient": null,
+      "winner": "gemini-flash",
+      "eliminated": "ernie"
+    },
+    {
+      "number": 2,
+      "date": "2026-01-10",
+      "type": "invention",
+      "theme": null,
+      "ingredient": null,
+      "winner": "cohere-north",
+      "eliminated": "nemotron"
+    },
+    {
+      "number": 3,
+      "date": "2026-01-17",
+      "type": "mystery-box",
+      "theme": "Mock theme about atlass",
+      "ingredient": "canvas",
+      "winner": "gemini-flash",
+      "eliminated": "gpt-oss"
+    },
+    {
+      "number": 4,
+      "date": "2026-01-24",
+      "type": "finale",
+      "theme": "Mock finale brief about orbits",
+      "ingredient": null,
+      "winner": "gemini-flash",
+      "eliminated": "cohere-north"
+    }
+  ],
+  "immune": null,
+  "nextTheme": null,
+  "champion": "gemini-flash"
+}

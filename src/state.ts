@@ -68,6 +68,10 @@ export interface Entry {
   judgeAvg: number;
   total: number;
   rank: number;
+  /** Finale: a guest score that was removed because the guest could not score both finalists. */
+  discardedGuestScores?: JudgeScore[];
+  /** Finale: earlier guest failure reasons, kept when the final outcome replaced them. */
+  guestAttempts?: string[];
 }
 
 export interface Abstention {
@@ -82,6 +86,8 @@ export interface Abstention {
 /** Why a judge sits out a dish from its own lab. The site recognises this text. */
 export const SAME_FAMILY_REASON = 'Same model family as the chef.';
 /** Why neither finalist's guest score counts when the guest could score only one of them. */
+/** What the record and the site say when the finale ran without the guest for lack of credit. Never the account's figures. */
+export const GUEST_SKIPPED_NO_CREDIT = 'There was not enough credit for it.';
 export const GUEST_UNEVEN_REASON = 'Guest judge could not score both finalists, so neither guest score counts.';
 
 export interface DuelVote {
@@ -118,6 +124,10 @@ export interface Episode {
   guestJudge?: string | null;
   /** The model that wrote the guest's brief, when it did. */
   guestBriefModel?: string | null;
+  /** Finale: why the guest judge did not take part (e.g. not enough credit). */
+  guestSkipped?: string | null;
+  /** Finale: why the uneven-guest rule was not applied (dropping would leave a finalist unjudged). */
+  guestRuleSkipped?: string | null;
   immune: string | null;
   entries: Entry[];
   winner: string;

@@ -193,6 +193,18 @@ export const GUEST_JUDGE: Judge | null = {
   bio: 'Guest judge for the finale. Sets the brief, then judges the whole plate.',
 };
 
+/**
+ * The finale runs without its guest when the OpenRouter key's limit or the
+ * account's credit is below this. Worst case for Claude Opus 5.5 at $4 / $20
+ * per million input / output tokens (OpenRouter, 2026-11-15):
+ *   brief, with one retry:     2 × (2k in + 4k out)
+ *   judging, 2 finalists × 2 attempts, each with full source (60k chars, ~15k
+ *   tokens) plus prompt and two screenshots (~5k): 4 × (20k in + 8k out)
+ *   = 84k in ($0.34) + 40k out ($0.80) = $1.14, rounded up for headroom.
+ * Re-derive it if you change GUEST_JUDGE.
+ */
+export const GUEST_MIN_CREDIT_USD = 1.5;
+
 export interface SecretIngredient {
   id: string;
   /** Told to the chefs and the judges, word for word. */

@@ -40,8 +40,22 @@ function app(tag: string): string {
 \`\`\``;
 }
 
+// MOCK_GUEST_FAIL targets only the finale guest: "brief" fails its brief (every
+// attempt), "one-dish" fails its judging of whichever finalist it sees second,
+// "balance" is read by episode.ts's mock credit reader.
+let guestFirstChef: string | null = null;
+
 export function mockChat(_messages: Msg[], opts: ChatOpts): string {
+  const knob = process.env.MOCK_GUEST_FAIL;
+  if (opts.kind === 'brief' && knob === 'brief') throw new Error('mock: the guest brief failed');
+  if (opts.kind === 'judge' && knob === 'one-dish' && opts.tag?.startsWith('guest:')) {
+    const chef = opts.tag.slice('guest:'.length);
+    guestFirstChef ??= chef;
+    if (chef !== guestFirstChef) throw new Error('mock: the guest could not judge this dish');
+  }
   switch (opts.kind) {
+    case 'brief':
+      return JSON.stringify({ brief: `Mock finale brief about ${pick(NOUNS).toLowerCase()}s`, theme: 'Mock finale theme' });
     case 'cook':
       return opts.tag === process.env.MOCK_FORFEIT ? 'I would rather not cook today.' : app(opts.tag ?? 'chef');
     case 'judge':

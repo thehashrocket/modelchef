@@ -14,8 +14,11 @@ export interface ChatOpts {
   maxTokens: number;
   temperature?: number;
   /** Only used to route mock responses and label logs. */
-  kind: 'cook' | 'judge' | 'duel' | 'theme' | 'ping';
+  kind: 'cook' | 'judge' | 'duel' | 'theme' | 'brief' | 'ping';
+  /** Mock routing: a chef id, or "<judgeId>:<chefId>" on judge and duel calls. */
   tag?: string;
+  /** Cancels the call, including its retries and backoff waits (the finale guest's time budget). */
+  signal?: AbortSignal;
 }
 
 export interface ChatResult {
@@ -26,6 +29,23 @@ export interface ChatResult {
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** A backoff wait that ends early, with the abort reason, when `signal` fires. */
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  if (!signal) return sleep(ms) as Promise<void>;
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
 
 // Free tiers are requests-per-minute limited, and nobody is waiting on this
 // job, so space calls to each provider well apart instead of racing 429s.
@@ -48,7 +68,11 @@ export async function chat(
   opts: ChatOpts,
 ): Promise<ChatResult> {
   // MOCK_FALLBACK=1 answers from the second model in the list, to exercise fallbacks without keys.
-  if (process.env.MOCK) return { text: mockChat(messages, opts), used: (process.env.MOCK_FALLBACK && models[1]) || models[0]!, stop: 'stop' };
+  if (process.env.MOCK) {
+    opts.signal?.throwIfAborted();
+    return { text: mockChat(messages, opts), used: (process.env.MOCK_FALLBACK && models[1]) || models[0]!, stop: 'stop' };
+  }
+  const signal = opts.signal;
 
   const errors: string[] = [];
   for (const ref of models) {
@@ -59,7 +83,9 @@ export async function chat(
       continue;
     }
     for (let attempt = 1; attempt <= 3; attempt++) {
+      signal?.throwIfAborted();
       await pace(ref.provider);
+      signal?.throwIfAborted();
       try {
         const res = await fetch(`${provider.baseUrl}/chat/completions`, {
           method: 'POST',
@@ -70,7 +96,7 @@ export async function chat(
             max_tokens: opts.maxTokens,
             temperature: opts.temperature ?? 0.8,
           }),
-          signal: AbortSignal.timeout(300_000),
+          signal: signal ? AbortSignal.any([AbortSignal.timeout(300_000), signal]) : AbortSignal.timeout(300_000),
         });
         if (res.ok) {
           const data = (await res.json()) as { choices?: { finish_reason?: string; message?: { content?: unknown } }[] };
@@ -82,7 +108,7 @@ export async function chat(
           // An empty reply is usually a blip, or a thinking model that spent its
           // whole budget before writing anything. Worth another attempt.
           errors.push(`${ref.provider}/${ref.model}: empty reply (stop reason: ${stop})`);
-          await sleep(attempt * 5_000);
+          await wait(attempt * 5_000, signal);
           continue;
         }
         const body = (await res.text()).replace(/\s+/g, ' ').slice(0, 300);
@@ -90,10 +116,12 @@ export async function chat(
         if (res.status !== 429 && res.status < 500) break;
         const retryAfter = Number(res.headers.get('retry-after'));
         const backoff = retryAfter > 0 ? retryAfter * 1000 : attempt * 20_000;
-        await sleep(Math.min(backoff, 90_000));
+        await wait(Math.min(backoff, 90_000), signal);
       } catch (err) {
+        // Out of budget: stop now, with no more retries or fallbacks.
+        if (signal?.aborted) throw new Error(`stopped: ${String((signal.reason as Error)?.message ?? signal.reason)} (${errors.join(' | ') || 'no reply yet'})`);
         errors.push(`${ref.provider}/${ref.model}: ${(err as Error).message}`);
-        await sleep(attempt * 5_000);
+        await wait(attempt * 5_000, signal);
       }
     }
   }
