@@ -56,6 +56,8 @@ DATA_DIR=.rehearsal pnpm episode   # a real episode against the live models that
 pnpm build
 ```
 
+Before a PR, run `pnpm verify`: unit tests (`pnpm test`), typecheck, and the site built from `data/` and from the fixtures in `test/fixtures/data/`. It needs no keys and no Chromium. CI runs it on every PR.
+
 The capture step needs Chromium: `pnpm exec playwright install chromium`, or set `CHROME_PATH` to a Chrome you already have. `MOCK_FORFEIT=<chef id>` makes one mock chef serve nothing.
 
 ## Tuning

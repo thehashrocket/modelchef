@@ -1,0 +1,33 @@
+name: Runner smoke
+
+# Mock episodes in real Chromium whenever the runner could have changed.
+# Uses canned models only (MOCK=1): no API keys, no secrets.
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  mock-episodes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Two mock episodes (the second answers from fallback models)
+        run: |
+          rm -rf .mock-data
+          pnpm episode:mock
+          MOCK_FALLBACK=1 pnpm episode:mock
+      - run: pnpm build:mock
