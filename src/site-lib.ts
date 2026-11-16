@@ -323,9 +323,10 @@ const rankSpan = (ep: Episode, e: Entry) => {
 
 function plate(season: string, ep: Episode, e: Entry, root: string): string {
   const base = `${root}${epPath(season, ep)}`;
+  // Every dish sits on the same neutral mat under a fake browser bar, so light and dark apps read as one set.
   return e.forfeit
-    ? `<div class="noshot">No dish served.<br>${esc(e.forfeit)}</div>`
-    : `<a class="shot" href="${base}/play-${e.contestant}.html"><img loading="lazy" src="${base}/shots/${e.contestant}-desktop.jpg" alt="Screenshot of ${esc(e.title)}" width="1280" height="800"></a>`;
+    ? `<div class="plate shot"><div class="noshot">No dish served.<br>${esc(e.forfeit)}</div></div>`
+    : `<a class="plate shot" href="${base}/play-${e.contestant}.html" aria-label="Open ${esc(e.title)}"><span class="chrome" aria-hidden="true"><i></i><i></i><i></i></span><img loading="lazy" src="${base}/shots/${e.contestant}-desktop.jpg" alt="Screenshot of ${esc(e.title)} at desktop width" width="1280" height="800"></a>`;
 }
 
 const scoreText = (ep: Episode, e: Entry) =>
