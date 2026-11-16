@@ -37,7 +37,14 @@ A chef whose model is down, or whose reply is not a complete HTML document, forf
 
 If an episode's commit does not deploy, check the deployment list in Vercel. The Hobby plan can refuse private-repo commits whose author is not the account owner; if that happens, change the `git config` lines in `.github/workflows/episode.yml` to your own name and GitHub email.
 
-If a run fails, GitHub emails you and nothing is recorded, so the fix is to run it again.
+### If a run fails
+
+GitHub emails you when the Episode workflow fails. **Do not just run it again**: a run always cooks the *next* episode (`episodes.length + 1` in `state.json`), so re-running after a run that did record its results airs an extra episode. Check first:
+
+1. **Is an Episode job still running?** Look at Actions → Episode. If one is running and already past the "Run the episode" step, wait for it: never cancel it while it is committing results. Otherwise wait for it to finish or cancel it.
+2. **Was the episode recorded?** On `main`, open `data/<season>/state.json` and check whether `episodes` has an entry for the episode that failed (and whether `data/<season>/ep-NN/` exists).
+3. **Not recorded:** the run failed before saving anything. Run Actions → Episode → Run workflow.
+4. **Recorded, but the commit, push or deploy failed:** fix that and push (or redeploy in Vercel). Do **not** re-run the workflow: that cooks the next episode.
 
 ## Running locally
 
