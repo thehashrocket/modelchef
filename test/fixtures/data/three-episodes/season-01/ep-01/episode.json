@@ -1,0 +1,454 @@
+{
+  "number": 1,
+  "date": "2026-01-03",
+  "type": "mystery-box",
+  "theme": "Something for a kitchen",
+  "themeChosenBy": null,
+  "ingredient": null,
+  "brief": "MYSTERY BOX. Every chef must build around this theme: \"Something for a kitchen\". Interpret it however you like, but a judge should see the connection without being told.",
+  "guestJudge": null,
+  "immune": null,
+  "entries": [
+    {
+      "contestant": "gemini-flash",
+      "label": "Dish D",
+      "model": "gemini/gemini-3.8-flash",
+      "forfeit": null,
+      "title": "Kettle Deck",
+      "pitch": "A mock dish from gemini-flash that counts clicks.",
+      "presentation": "Judges, today I have made you Kettle Deck. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 802,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "score": 10
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 9,
+            "craft": 7,
+            "originality": 8,
+            "theme": 7
+          },
+          "weighted": 8,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 7,
+            "craft": 7,
+            "originality": 7,
+            "theme": 4
+          },
+          "weighted": 6.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 9,
+            "craft": 9,
+            "originality": 4,
+            "theme": 6
+          },
+          "weighted": 6.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        }
+      ],
+      "abstained": [],
+      "judgeAvg": 6.933333333333334,
+      "total": 7.546666666666667,
+      "rank": 1
+    },
+    {
+      "contestant": "cohere-north",
+      "label": "Dish E",
+      "model": "openrouter/cohere/north-mini-code:free",
+      "forfeit": null,
+      "title": "Atlas Lab",
+      "pitch": "A mock dish from cohere-north that counts clicks.",
+      "presentation": "Judges, today I have made you Atlas Lab. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 796,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "score": 10
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 5,
+            "craft": 9,
+            "originality": 6,
+            "theme": 6
+          },
+          "weighted": 6.2,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 8,
+            "craft": 8,
+            "originality": 6,
+            "theme": 7
+          },
+          "weighted": 7.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 9,
+            "craft": 7,
+            "originality": 7,
+            "theme": 4
+          },
+          "weighted": 6.8,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        }
+      ],
+      "abstained": [],
+      "judgeAvg": 6.800000000000001,
+      "total": 7.440000000000001,
+      "rank": 2
+    },
+    {
+      "contestant": "gemma",
+      "label": "Dish A",
+      "model": "gemini/gemma-4-31b-it",
+      "forfeit": null,
+      "title": "Ledger Lab",
+      "pitch": "A mock dish from gemma that counts clicks.",
+      "presentation": "Judges, today I have made you Ledger Lab. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 793,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "score": 10
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 9,
+            "craft": 4,
+            "originality": 7,
+            "theme": 8
+          },
+          "weighted": 7.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 5,
+            "craft": 7,
+            "originality": 7,
+            "theme": 4
+          },
+          "weighted": 6,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 6,
+            "craft": 6,
+            "originality": 7,
+            "theme": 7
+          },
+          "weighted": 6.6,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        }
+      ],
+      "abstained": [],
+      "judgeAvg": 6.666666666666667,
+      "total": 7.333333333333334,
+      "rank": 3
+    },
+    {
+      "contestant": "nemotron",
+      "label": "Dish C",
+      "model": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "forfeit": null,
+      "title": "Atlas Board",
+      "pitch": "A mock dish from nemotron that counts clicks.",
+      "presentation": "Judges, today I have made you Atlas Board. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 798,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "score": 10
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 7,
+            "craft": 4,
+            "originality": 4,
+            "theme": 4
+          },
+          "weighted": 5.2,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 4,
+            "craft": 9,
+            "originality": 4,
+            "theme": 8
+          },
+          "weighted": 6.8,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        }
+      ],
+      "abstained": [
+        {
+          "judge": "maverick",
+          "reason": "Same model family as the chef."
+        }
+      ],
+      "judgeAvg": 6,
+      "total": 6.800000000000001,
+      "rank": 4
+    },
+    {
+      "contestant": "ernie",
+      "label": "Dish B",
+      "model": "openrouter/baidu/ernie-5.5-flash-preview:free",
+      "forfeit": null,
+      "title": "Tide Board",
+      "pitch": "A mock dish from ernie that counts clicks.",
+      "presentation": "Judges, today I have made you Tide Board. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 882,
+        "consoleErrors": [
+          "mock: something broke"
+        ],
+        "networkAttempts": [
+          "https://example.com/data.json"
+        ],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "score": 5
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 9,
+            "craft": 8,
+            "originality": 4,
+            "theme": 6
+          },
+          "weighted": 7.2,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 8,
+            "craft": 5,
+            "originality": 5,
+            "theme": 6
+          },
+          "weighted": 5.8,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 8,
+            "craft": 4,
+            "originality": 9,
+            "theme": 8
+          },
+          "weighted": 7.6,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        }
+      ],
+      "abstained": [],
+      "judgeAvg": 6.866666666666667,
+      "total": 6.493333333333334,
+      "rank": 5
+    },
+    {
+      "contestant": "gpt-oss",
+      "label": "Dish F",
+      "model": "groq/openai/gpt-oss-120b",
+      "forfeit": null,
+      "title": "Ember Pad",
+      "pitch": "A mock dish from gpt-oss that counts clicks.",
+      "presentation": "Judges, today I have made you Ember Pad. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 793,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "score": 10
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 5,
+            "craft": 8,
+            "originality": 5,
+            "theme": 4
+          },
+          "weighted": 5.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 4,
+            "craft": 7,
+            "originality": 5,
+            "theme": 7
+          },
+          "weighted": 6,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 6,
+            "craft": 4,
+            "originality": 4,
+            "theme": 9
+          },
+          "weighted": 5.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click."
+        }
+      ],
+      "abstained": [],
+      "judgeAvg": 5.6000000000000005,
+      "total": 6.48,
+      "rank": 6
+    }
+  ],
+  "winner": "gemini-flash",
+  "pressure": {
+    "spec": "A colour palette builder: pick a base colour, generate five harmonious colours, show hex and HSL, click any swatch to copy.",
+    "chefs": [
+      "ernie",
+      "gpt-oss"
+    ],
+    "forfeits": {},
+    "votes": [
+      {
+        "judge": "pragmatist",
+        "judgeName": "The Pragmatist",
+        "winner": "gpt-oss",
+        "reason": "Mock reason: cleaner plate.",
+        "order": [
+          "ernie",
+          "gpt-oss"
+        ]
+      },
+      {
+        "judge": "craftsman",
+        "judgeName": "The Craftsman",
+        "winner": "gpt-oss",
+        "reason": "Mock reason: cleaner plate.",
+        "order": [
+          "ernie",
+          "gpt-oss"
+        ]
+      },
+      {
+        "judge": "maverick",
+        "judgeName": "The Maverick",
+        "winner": "ernie",
+        "reason": "Mock reason: cleaner plate.",
+        "order": [
+          "gpt-oss",
+          "ernie"
+        ]
+      }
+    ],
+    "eliminated": "ernie",
+    "decidedBy": "votes"
+  },
+  "eliminated": "ernie"
+}

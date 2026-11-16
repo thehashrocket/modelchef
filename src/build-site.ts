@@ -3,46 +3,11 @@
 // CSP inside a sandboxed iframe: this site serves JavaScript nobody reviewed.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CONTESTANTS, DATA_DIR, JUDGES } from './config';
-import { challengeText, RULES } from './prompts';
-import { average, SAME_FAMILY_REASON, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type SeasonState } from './state';
+import { DATA_DIR, JUDGES } from './config';
+import { chefName, episodeBlock, esc, isPilot, pad, recapHtml, seasonLabel } from './site-lib';
+import { average, type Episode, type SeasonState } from './state';
 
 const OUT = 'dist';
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-const chefName = (id: string) => CONTESTANTS.find((c) => c.id === id)?.name ?? id;
-const judgeName = (id: string) => JUDGES.find((j) => j.id === id)?.name ?? id;
-const pad = (n: number) => String(n).padStart(2, '0');
-/** A folder named "pilot" is a trial run: shown on the site, never counted. */
-const isPilot = (season: string) => season === 'pilot';
-const seasonLabel = (season: string) => {
-  if (isPilot(season)) return 'Pilot';
-  const m = /^season-0*(\d+)$/.exec(season);
-  return m ? `Season ${m[1]}` : season;
-};
-const fmtDate = (iso: string) => {
-  const d = new Date(`${iso}T12:00:00Z`);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-};
-/** Judges see the pressure-test pair as "Dish A" and "Dish B"; readers should see who they mean. */
-function nameDishes(reason: string, order?: [string, string]): string {
-  if (!order) return esc(reason);
-  const name = (l: string) => chefName(l === 'A' ? order[0] : order[1]);
-  return esc(reason.replace(/\bDish ([AB])\b/g, (_, l: string) => name(l)).replace(/\b([AB])(['’]s)\b/g, (_, l: string, s: string) => name(l) + s));
-}
-/** Records made before judge models were kept have no `model` on any score. */
-const keepsModels = (ep: Episode) => ep.entries.some((e) => e.judges.some((j) => j.model)) || !!ep.pressure?.votes.some((v) => v.model);
-const isSameFamily = (reason: string) => reason === SAME_FAMILY_REASON || /^(Abstained: )?same model family/i.test(reason);
-const prov = (text: string) => `<small class="prov">${text}</small>`;
-/** Which model stood behind a judge's score, vote or abstention. */
-function provenance(ep: Episode, x: JudgeScore | DuelVote | Abstention): string {
-  if ('reason' in x && isSameFamily(x.reason)) return '';
-  if (!keepsModels(ep)) return prov('model not recorded');
-  const scored = 'scores' in x || ('winner' in x && x.winner !== null);
-  if (x.model) return prov(scored ? `judged by ${esc(x.model)}` : `reply from ${esc(x.model)} could not be read`);
-  return prov('no model answered');
-}
-const TYPE_LABEL = { 'mystery-box': 'Mystery Box', invention: 'Invention Test', finale: 'Finale' } as const;
 
 const CSP =
   `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
@@ -78,9 +43,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 tr.out td{color:var(--muted)}
 .scroll{overflow-x:auto}
 @media (max-width:560px){th,td{padding:9px 10px}th:nth-child(n+4),td:nth-child(n+4){display:none}td:first-child{min-width:9.5em}}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(310px,100%),1fr));gap:18px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
-.card img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;border-bottom:1px solid var(--line);background:var(--line)}
+.card img{width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;border-bottom:1px solid var(--line);background:var(--line)}
 .noshot{aspect-ratio:16/10;display:grid;place-items:center;color:var(--muted);border-bottom:1px solid var(--line);padding:16px;text-align:center}
 .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
 .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
@@ -100,13 +65,23 @@ tr.out td{color:var(--muted)}
 .badge.gone{color:var(--bad);border-color:currentColor}
 .mech{font-size:.82rem;color:var(--muted)}
 details{font-size:.92rem}
-summary{cursor:pointer;color:var(--accent);font-weight:600;padding:2px 0}
-summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+summary{cursor:pointer;color:var(--accent);font-weight:600;padding:11px 0}
+a:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
 blockquote{margin:10px 0 0;padding-left:12px;border-left:3px solid var(--line)}
 blockquote b{display:block}
 blockquote small{color:var(--muted)}
 .prov{display:block;color:var(--muted);font-size:.78rem}
 .play{margin-top:auto;font-weight:700}
+.recap{font-size:1.05rem;color:var(--ink);max-width:70ch;margin:0 0 18px;overflow-wrap:anywhere}
+.status .recap-line{font-weight:400;overflow-wrap:anywhere}
+h3{overflow-wrap:anywhere}
+.feature{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:grid;grid-template-columns:1fr;margin-bottom:18px}
+.feature h3{font-size:1.6rem}
+.feature .shot{align-self:start}
+.feature img{width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;background:var(--line)}
+.notes h4{margin:6px 0 0;font-size:.92rem;color:var(--muted)}
+.wide-only{display:none}
+@media (min-width:760px){.feature{grid-template-columns:11fr 9fr}.feature .shot{border-right:1px solid var(--line)}.wide-only{display:block}.narrow-only{display:none}}
 .brief{margin:0 0 18px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
 .brief p{margin:10px 0 0}
 .brief pre{margin:10px 0 0;white-space:pre-wrap;font:inherit;font-size:.9rem;color:var(--muted)}
@@ -157,77 +132,6 @@ iframe{flex:1;border:0;width:100%;background:#fff}
 `;
 }
 
-function card(season: string, ep: Episode, e: Entry): string {
-  const base = `s/${season}/ep-${pad(ep.number)}`;
-  const badges: string[] = [];
-  if (e.contestant === ep.winner) badges.push(`<span class="badge win">${ep.type === 'finale' ? 'Champion' : 'Winner'}</span>`);
-  if (e.contestant === ep.immune) badges.push('<span class="badge">Immune</span>');
-  if (ep.pressure?.chefs.includes(e.contestant)) badges.push('<span class="badge">Pressure test</span>');
-  if (e.contestant === ep.eliminated) badges.push('<span class="badge gone">Eliminated</span>');
-  if (e.forfeit) badges.push('<span class="badge gone">Forfeit</span>');
-
-  const shot = e.forfeit
-    ? `<div class="noshot">No dish served.<br>${esc(e.forfeit)}</div>`
-    : `<a href="${base}/play-${e.contestant}.html"><img loading="lazy" src="${base}/shots/${e.contestant}-desktop.jpg" alt="Screenshot of ${esc(e.title)}"></a>`;
-
-  const m = e.mech;
-  const mech = m
-    ? `<div class="mech">Machine check ${m.score}/10 · ${(m.bytes / 1024).toFixed(0)} KB · ${m.consoleErrors.length} console error${m.consoleErrors.length === 1 ? '' : 's'} · ${m.networkAttempts.length} network attempt${m.networkAttempts.length === 1 ? '' : 's'}${m.mobileOverflow ? ' · overflows on phone' : ''}${m.ingredient === 'missing' ? ' · secret ingredient missing' : ''}</div>`
-    : '';
-
-  const short = (name: string) => name.replace(/^The /, '');
-  const jrow = e.judges.length
-    ? `<div class="jrow" aria-label="Judge scores">${e.judges.map((j) => `<span>${esc(short(j.judgeName))} <b>${j.weighted.toFixed(1)}</b></span>`).join('')}</div>`
-    : '';
-  const notes = e.judges.length
-    ? `<details><summary>Judges' notes</summary>${e.judges
-        .map(
-          (j) =>
-            `<blockquote><b>${esc(j.judgeName)} · ${j.weighted.toFixed(1)}</b>${esc(j.critique)}<br><small>Use ${j.scores.usefulness} · Craft ${j.scores.craft} · Originality ${j.scores.originality} · Theme ${j.scores.theme}</small>${provenance(ep, j)}</blockquote>`,
-        )
-        .join('')}${e.abstained.map((a) => `<blockquote><b>${esc(a.judgeName ?? judgeName(a.judge))} abstained</b><small>${esc(a.reason)}</small>${provenance(ep, a)}</blockquote>`).join('')}</details>`
-    : '';
-
-  return `<article class="card">${shot}<div class="body">
-<div class="row"><h3>${e.rank}. ${esc(e.title)}</h3><span class="score">${e.forfeit ? '–' : e.total.toFixed(1)}</span></div>
-<div class="by">${esc(chefName(e.contestant))}</div>
-<div class="badges">${badges.join('')}</div>
-${e.forfeit ? '' : `<p class="pitch">${esc(e.pitch)}</p>`}
-${e.presentation ? `<details class="says"><summary>What the chef told the judges</summary><p>${esc(e.presentation)}</p></details>` : ''}
-${jrow}${mech}${notes}
-${e.forfeit ? '' : `<a class="play" href="${base}/play-${e.contestant}.html">Open the dish &rarr;</a>`}
-</div></article>`;
-}
-
-function pressureBlock(season: string, ep: Episode): string {
-  const p = ep.pressure;
-  if (!p) return '';
-  const base = `s/${season}/ep-${pad(ep.number)}`;
-  const how =
-    p.decidedBy === 'votes' ? 'The judges voted.'
-    : p.decidedBy === 'forfeit' ? 'The other chef failed to serve a dish.'
-    : 'The judges could not separate them, so the main-round score decided it.';
-  const dishes = p.chefs
-    .map((id) => (p.forfeits[id] ? `${esc(chefName(id))} (no dish)` : `<a href="${base}/play-pressure-${id}.html">${esc(chefName(id))}</a>`))
-    .join(' vs ');
-  const votes = p.votes
-    .map((v) => `<li><b>${esc(v.judgeName)}</b>${v.winner ? ` picked ${esc(chefName(v.winner))}.` : ''} ${nameDishes(v.reason, v.order)}${provenance(ep, v)}</li>`)
-    .join('');
-  return `<div class="pressure"><h3>Pressure test</h3>
-<p>${dishes}</p>
-<p><b>The spec:</b> ${esc(p.spec)}</p>
-<p><b>${esc(chefName(p.eliminated))} went home.</b> ${how}</p>
-${votes ? `<ul>${votes}</ul>` : ''}</div>`;
-}
-
-/** What the chefs were actually told: the episode's challenge, then the standing house rules. */
-function briefBlock(ep: Episode): string {
-  // Episodes recorded before the brief was stored are rebuilt from their type and theme.
-  const brief =
-    ep.brief ?? challengeText({ type: ep.type, theme: ep.theme, ingredient: ep.ingredient?.text ?? null, guest: ep.guestJudge ?? null });
-  return `<details class="brief"><summary>The brief the chefs were given</summary><p>${esc(brief).replace(/\n+/g, '</p><p>')}</p><pre>${esc(RULES)}</pre><p>Each chef also sees its own record, the judges' notes on its last dish, the standings, and what won the previous episode.</p></details>`;
-}
-
 function seasonSection(season: string, state: SeasonState, episodes: Episode[]): string {
   const left = Object.values(state.contestants).filter((c) => c.status === 'active').length;
   const rows = Object.entries(state.contestants)
@@ -245,26 +149,7 @@ function seasonSection(season: string, state: SeasonState, episodes: Episode[]):
     })
     .join('');
 
-  const eps = [...episodes]
-    .reverse()
-    .map((ep) => {
-      const theme = ep.theme ? ` &ldquo;${esc(ep.theme)}&rdquo;` : '';
-      const by = ep.themeChosenBy
-        ? ` Theme chosen by ${esc(chefName(ep.themeChosenBy))}.`
-        : ep.guestJudge && ep.theme
-          ? ` Brief set by ${esc(ep.guestJudge)}.`
-          : ep.guestJudge
-            ? ` With ${esc(ep.guestJudge)}.`
-            : '';
-      const twist = ep.ingredient ? `<p class="sub"><b>Secret ingredient:</b> ${esc(ep.ingredient.text)}</p>` : '';
-      const title = isPilot(season) ? 'Pilot' : `Episode ${ep.number}`;
-      return `<h2 id="${esc(season)}-ep-${pad(ep.number)}">${title}: ${TYPE_LABEL[ep.type]}${theme}</h2>
-<p class="sub">${esc(fmtDate(ep.date))}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}
-${briefBlock(ep)}
-<div class="grid">${ep.entries.map((e) => card(season, ep, e)).join('')}</div>
-${pressureBlock(season, ep)}`;
-    })
-    .join('');
+  const eps = [...episodes].reverse().map((ep) => episodeBlock(season, ep)).join('');
 
   // A pilot has no standings: its scores never counted toward anything.
   if (isPilot(season)) {
@@ -311,6 +196,7 @@ function main() {
 
   let status = 'The first episode has not aired yet.';
   let latest = '';
+  let recap = '';
   const sections: string[] = [];
   for (const [i, season] of seasons.entries()) {
     const state = JSON.parse(readFileSync(join(DATA_DIR, season, 'state.json'), 'utf8')) as SeasonState;
@@ -326,6 +212,8 @@ function main() {
         : `${seasonLabel(season)}, ${state.episodes.length} episode${state.episodes.length === 1 ? '' : 's'} in. ${left} chefs remain.`;
       const last = state.episodes.at(-1);
       if (last) latest = ` <a class="latest" href="#${esc(season)}-ep-${pad(last.number)}">Watch episode ${last.number} &darr;</a>`;
+      const lastEp = episodes.at(-1);
+      if (lastEp) recap = ` <span class="recap-line">${recapHtml(season, lastEp)}</span>`;
     }
   }
 
@@ -333,11 +221,12 @@ function main() {
   const body = `<header>
 <h1>Model<span>Chef</span></h1>
 <p class="tag">A weekly cooking competition for language models. Every chef gets the same brief and one shot at a single-file web app. Three model judges score the dishes blind, the bottom two face a pressure test, and one chef goes home. Nothing is edited by a human.</p>
-<p class="status">${esc(status)}${latest}</p>
+<p class="status">${esc(status)}${recap}${latest}</p>
 <p class="panel"><b>The panel:</b> ${JUDGES.map((j) => `${esc(j.name)} (${j.lens === 'overall' ? 'the whole plate' : esc(j.lens)})`).join(', ')}. Each judge's own specialty counts double in their score, and the machine check covers the house rules.</p>
 </header>
 ${sections.join('')}
-<footer><p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}">github.com/${esc(repo)}</a>.` : ''}</p>
+<footer><p>Model output and scores are never edited. Recaps and labels are generated from the episode record by code.</p>
+<p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}">github.com/${esc(repo)}</a>.` : ''}</p>
 <p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p></footer>`;
 
   writeFileSync(join(OUT, 'index.html'), page('ModelChef', body));
