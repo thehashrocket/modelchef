@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { abstentionKind, atomFeed, card, nextEpisodeLine, nextSaturday, dishChrome, featuredCard, fmtScores, judgeChips, judgeClass, judgeCss, panelJudges, unknownJudgeIds, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
+import { abstentionKind, atomFeed, card, guestNotes, nextEpisodeLine, nextSaturday, dishChrome, featuredCard, fmtScores, judgeChips, judgeClass, judgeCss, panelJudges, unknownJudgeIds, mechLine, mechProblems, metaTags, recapText, resolveSiteUrl, tieTitle } from './site-lib';
 import { GUEST_UNEVEN_REASON, SAME_FAMILY_REASON, type DuelVote, type Entry, type Episode, type PressureTest } from './state';
 
 const entry = (contestant: string, total: number, over: Partial<Entry> = {}): Entry => ({
@@ -378,4 +378,17 @@ describe('atomFeed', () => {
     assert.match(xml, /<feed[^>]*>[\s\S]*?<updated>2027-03-06T17:23:00Z<\/updated>/);
     assert.match(xml, /is the Season 2 champion/);
   });
+});
+
+describe('guestNotes', () => {
+  it('says why the guest sat out', () => {
+    const ep = episode(null, { type: 'finale', guestSkipped: 'The OpenRouter key has $0.40 of its limit left; the guest judge needs at least $1.50.' });
+    assert.match(guestNotes(ep), /<p class="sub note">The guest judge did not take part\. The OpenRouter key has \$0\.40/);
+  });
+  it('says the single guest score was kept, naming the chef', () => {
+    const ep = episode(null, { type: 'finale', guestRuleSkipped: 'dropping the guest would leave gpt-oss unjudged' });
+    ep.entries[1]!.judges = [{ judge: 'guest', judgeName: 'Claude Opus 5.5', lens: 'overall', scores: { usefulness: 8, craft: 8, originality: 8, theme: 8 }, weighted: 8, critique: '', improve: '' }];
+    assert.match(guestNotes(ep), /The guest judge scored only GPT-OSS 120B\. That score was kept so both finalists have a score; the panels differed\./);
+  });
+  it('is empty otherwise', () => assert.equal(guestNotes(episode(null)), ''));
 });

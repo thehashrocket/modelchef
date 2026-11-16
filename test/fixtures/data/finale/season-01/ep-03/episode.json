@@ -1,0 +1,260 @@
+{
+  "number": 3,
+  "date": "2026-01-17",
+  "type": "mystery-box",
+  "theme": "Mock theme about atlass",
+  "themeChosenBy": "cohere-north",
+  "ingredient": {
+    "id": "canvas",
+    "text": "Canvas only. Everything the user sees must be drawn on a single <canvas> element: no HTML buttons, inputs, or text outside it."
+  },
+  "brief": "MYSTERY BOX. Every chef must build around this theme: \"Mock theme about atlass\". Interpret it however you like, but a judge should see the connection without being told.\n\nSECRET INGREDIENT. On top of the theme, every dish must obey this: Canvas only. Everything the user sees must be drawn on a single <canvas> element: no HTML buttons, inputs, or text outside it. A dish that ignores it is marked down hard, by the judges and by machine.",
+  "guestJudge": null,
+  "guestBriefModel": null,
+  "immune": "cohere-north",
+  "entries": [
+    {
+      "contestant": "gemini-flash",
+      "label": "Dish B",
+      "model": "gemini/gemini-3.8-flash",
+      "forfeit": null,
+      "title": "SupercalifragilisticexpialidociousKitchenmultitoolorganiserexpeditorplannerBoard",
+      "pitch": "A mock dish from gemini-flash that counts clicks.",
+      "presentation": "Judges, today I have made you Ledger Pad. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 800,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "ingredient": "missing",
+        "score": 7
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 8,
+            "craft": 5,
+            "originality": 7,
+            "theme": 9
+          },
+          "weighted": 7.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/inclusionai/ling-3.2-flash:free"
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 5,
+            "craft": 8,
+            "originality": 7,
+            "theme": 5
+          },
+          "weighted": 6.6,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "xai/grok-4.5"
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 9,
+            "craft": 9,
+            "originality": 6,
+            "theme": 6
+          },
+          "weighted": 7.2,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/nvidia/nemotron-3.5-super-vl:free"
+        }
+      ],
+      "abstained": [],
+      "judgeAvg": 7.066666666666666,
+      "total": 7.053333333333334,
+      "rank": 1
+    },
+    {
+      "contestant": "gemma",
+      "label": "Dish A",
+      "model": "gemini/gemma-4-31b-it",
+      "forfeit": null,
+      "title": "Ember Deck",
+      "pitch": "A mock dish from gemma that counts clicks.",
+      "presentation": "Judges, today I have made you Ember Deck. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 793,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "ingredient": "missing",
+        "score": 7
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 8,
+            "craft": 8,
+            "originality": 6,
+            "theme": 7
+          },
+          "weighted": 7.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/inclusionai/ling-3.2-flash:free"
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 9,
+            "craft": 5,
+            "originality": 5,
+            "theme": 8
+          },
+          "weighted": 6.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "xai/grok-4.5"
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 8,
+            "craft": 7,
+            "originality": 7,
+            "theme": 6
+          },
+          "weighted": 7,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/nvidia/nemotron-3.5-super-vl:free"
+        }
+      ],
+      "abstained": [],
+      "judgeAvg": 6.933333333333334,
+      "total": 6.946666666666667,
+      "rank": 2
+    },
+    {
+      "contestant": "cohere-north",
+      "label": "Dish D",
+      "model": "openrouter/cohere/north-mini-code:free",
+      "forfeit": null,
+      "title": "Ember Board",
+      "pitch": "A mock dish from cohere-north that counts clicks.",
+      "presentation": "Judges, today I have made you Ember Board. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 800,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "ingredient": "missing",
+        "score": 7
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 4,
+            "craft": 9,
+            "originality": 9,
+            "theme": 6
+          },
+          "weighted": 6.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/inclusionai/ling-3.2-flash:free"
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 6,
+            "craft": 7,
+            "originality": 4,
+            "theme": 7
+          },
+          "weighted": 6.2,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "xai/grok-4.5"
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 7,
+            "craft": 5,
+            "originality": 4,
+            "theme": 8
+          },
+          "weighted": 5.6,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/nvidia/nemotron-3.5-super-vl:free"
+        }
+      ],
+      "abstained": [],
+      "judgeAvg": 6.066666666666667,
+      "total": 6.253333333333335,
+      "rank": 3
+    },
+    {
+      "contestant": "gpt-oss",
+      "label": "Dish C",
+      "model": "groq/openai/gpt-oss-120b",
+      "forfeit": "The reply did not contain a complete HTML document (stop reason: stop, 30 characters).",
+      "title": "No dish",
+      "pitch": "",
+      "presentation": "",
+      "mech": null,
+      "judges": [],
+      "abstained": [],
+      "judgeAvg": 0,
+      "total": 0,
+      "rank": 4
+    }
+  ],
+  "winner": "gemini-flash",
+  "pressure": {
+    "spec": "A countdown board that tracks up to six named countdowns to dates the user enters, sorted by soonest.",
+    "chefs": [
+      "gemma",
+      "gpt-oss"
+    ],
+    "forfeits": {
+      "gpt-oss": "The reply did not contain a complete HTML document (stop reason: stop, 30 characters)."
+    },
+    "votes": [],
+    "eliminated": "gpt-oss",
+    "decidedBy": "forfeit"
+  },
+  "eliminated": "gpt-oss"
+}

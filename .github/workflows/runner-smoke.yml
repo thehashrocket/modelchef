@@ -31,3 +31,12 @@ jobs:
           pnpm episode:mock
           MOCK_FALLBACK=1 pnpm episode:mock
       - run: pnpm build:mock
+      # The finale from a committed two-chef season, once per guest-judge knob.
+      - name: Mock finales (guest normal, brief fails, one dish fails, low balance)
+        run: |
+          for knob in none brief one-dish balance; do
+            rm -rf "$RUNNER_TEMP/finale" && cp -R test/fixtures/finale-start "$RUNNER_TEMP/finale"
+            if [ "$knob" = none ]; then unset MOCK_GUEST_FAIL; else export MOCK_GUEST_FAIL=$knob; fi
+            MOCK=1 DATA_DIR="$RUNNER_TEMP/finale" SHARE_IMAGE=0 pnpm exec tsx src/episode.ts
+            test -f "$RUNNER_TEMP/finale/season-01/ep-04/episode.json"
+          done

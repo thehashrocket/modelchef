@@ -3,6 +3,7 @@
 //
 // Every string that came out of a model goes through esc() before it reaches HTML.
 import { CONTESTANTS, GUEST_JUDGE, JUDGES, SCORING, type Judge } from './config';
+import { guestKeptNote } from './finale';
 import { challengeText, RULES } from './prompts';
 import { GUEST_UNEVEN_REASON, isPilot, SAME_FAMILY_REASON, seasonLabel, TYPE_LABEL, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type MechReport } from './state';
 
@@ -397,6 +398,18 @@ export function briefBlock(ep: Episode): string {
   return `<details class="brief"><summary>The brief the chefs were given</summary><p>${esc(brief).replace(/\n+/g, '</p><p>')}</p><pre>${esc(RULES)}</pre><p>Each chef also sees its own record, the judges' notes on its last dish, the standings, and what won the previous episode.</p></details>`;
 }
 
+/** Finale notes from the record: the guest sat out for lack of credit, or its single score was kept. */
+export function guestNotes(ep: Episode): string {
+  const notes: string[] = [];
+  if (ep.guestSkipped) notes.push(`The guest judge did not take part. ${ep.guestSkipped}`);
+  if (ep.guestRuleSkipped) {
+    const guestId = GUEST_JUDGE?.id ?? 'guest';
+    const scored = ep.entries.find((e) => e.judges.some((j) => j.judge === guestId));
+    if (scored) notes.push(guestKeptNote(chefName(scored.contestant)));
+  }
+  return notes.map((n) => `<p class="sub note">${esc(n)}</p>`).join('');
+}
+
 /** One episode: heading, date, recap, the winner featured, the brief, the rest of the field, the pressure test. */
 export function episodeBlock(season: string, ep: Episode, root = ''): string {
   const theme = ep.theme ? ` &ldquo;${esc(ep.theme)}&rdquo;` : '';
@@ -412,7 +425,7 @@ export function episodeBlock(season: string, ep: Episode, root = ''): string {
   const winner = ep.entries.find((e) => e.contestant === ep.winner);
   const rest = ep.entries.filter((e) => e.contestant !== ep.winner);
   return `<h2 id="${esc(epAnchor(season, ep))}">${title}: ${TYPE_LABEL[ep.type]}${theme}</h2>
-<p class="sub">${esc(fmtDate(ep.date))}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}
+<p class="sub">${esc(fmtDate(ep.date))}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}${guestNotes(ep)}
 <p class="recap">${recapHtml(season, ep)}</p>
 ${winner ? featuredCard(season, ep, winner, root) : ''}
 ${briefBlock(ep)}
@@ -446,7 +459,7 @@ export function dishChrome(
       opts.next ? `<a href="${opts.next.href}" aria-label="Next dish: ${esc(opts.next.label)}">Next &rsaquo;</a>` : '',
     ].join('');
     const bar = `<header class="bar">${back}<b class="t">${esc(e.title)}</b><span class="r2"><span class="m">by ${esc(chefName(e.contestant))} · #${e.rank} · ${episodeFmt(ep)(e.total)}/10</span><span class="pn">${nav}</span></span>${verdict}</header>`;
-    const panel = `${e.pitch ? `<p class="pitch">${esc(e.pitch)}</p>` : ''}
+    const panel = `${e.contestant === ep.winner ? guestNotes(ep) : ''}${e.pitch ? `<p class="pitch">${esc(e.pitch)}</p>` : ''}
 ${e.judges.length ? notesBlock(ep, e, true) : '<p>Not judged.</p>'}
 ${mechLine(e.mech, ep)}
 ${footer}`;

@@ -29,6 +29,7 @@ const builds: { label: string; env: Record<string, string>; episodes?: number }[
   { label: 'data/', env: {} },
   { label: 'test/fixtures/data/three-episodes', env: { DATA_DIR: 'test/fixtures/data/three-episodes' }, episodes: 3 },
   { label: 'test/fixtures/data/two-seasons', env: { DATA_DIR: 'test/fixtures/data/two-seasons' }, episodes: 4 },
+  { label: 'test/fixtures/data/finale', env: { DATA_DIR: 'test/fixtures/data/finale' }, episodes: 4 },
   // Absolute share tags: check-links maps this origin back onto dist/.
   { label: 'three-episodes with SITE_URL', env: { DATA_DIR: 'test/fixtures/data/three-episodes', SITE_URL: 'https://example.test' }, episodes: 3 },
 ];

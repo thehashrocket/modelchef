@@ -1,0 +1,191 @@
+{
+  "number": 4,
+  "date": "2026-01-24",
+  "type": "finale",
+  "theme": "Mock finale brief about orbits",
+  "themeChosenBy": null,
+  "ingredient": null,
+  "brief": "THE FINALE. Two chefs remain. Claude Opus 5.5 has set the final brief: \"Mock finale brief about orbits\". Build your signature dish to that brief: the single best small web app you can make.",
+  "guestJudge": "Claude Opus 5.5",
+  "guestBriefModel": "openrouter/anthropic/claude-opus-5.5",
+  "guestSkipped": null,
+  "guestRuleSkipped": null,
+  "immune": null,
+  "entries": [
+    {
+      "contestant": "gemini-flash",
+      "label": "Dish A",
+      "model": "gemini/gemini-3.8-flash",
+      "forfeit": null,
+      "title": "Orbit Board",
+      "pitch": "A mock dish from gemini-flash that counts clicks.",
+      "presentation": "Judges, today I have made you Orbit Board. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 802,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "score": 10
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 9,
+            "craft": 5,
+            "originality": 6,
+            "theme": 6
+          },
+          "weighted": 7,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/inclusionai/ling-3.2-flash:free"
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 9,
+            "craft": 9,
+            "originality": 5,
+            "theme": 6
+          },
+          "weighted": 7.6,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "xai/grok-4.5"
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 5,
+            "craft": 5,
+            "originality": 7,
+            "theme": 8
+          },
+          "weighted": 6.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/nvidia/nemotron-3.5-super-vl:free"
+        }
+      ],
+      "abstained": [
+        {
+          "judge": "guest",
+          "judgeName": "Claude Opus 5.5",
+          "reason": "Guest judge could not score both finalists, so neither guest score counts."
+        }
+      ],
+      "judgeAvg": 7,
+      "total": 7.6000000000000005,
+      "rank": 1,
+      "discardedGuestScores": [
+        {
+          "judge": "guest",
+          "judgeName": "Claude Opus 5.5",
+          "lens": "overall",
+          "scores": {
+            "usefulness": 4,
+            "craft": 5,
+            "originality": 9,
+            "theme": 9
+          },
+          "weighted": 6.75,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/anthropic/claude-opus-5.5"
+        }
+      ]
+    },
+    {
+      "contestant": "cohere-north",
+      "label": "Dish B",
+      "model": "openrouter/cohere/north-mini-code:free",
+      "forfeit": null,
+      "title": "Kettle Lab",
+      "pitch": "A mock dish from cohere-north that counts clicks.",
+      "presentation": "Judges, today I have made you Kettle Lab. I chose it because clicking is universal. After your last notes, I made the button a different colour.",
+      "mech": {
+        "bytes": 800,
+        "consoleErrors": [],
+        "networkAttempts": [],
+        "mobileOverflow": false,
+        "blank": false,
+        "hasTitle": true,
+        "hasDescription": true,
+        "score": 10
+      },
+      "judges": [
+        {
+          "judge": "pragmatist",
+          "judgeName": "The Pragmatist",
+          "lens": "usefulness",
+          "scores": {
+            "usefulness": 9,
+            "craft": 4,
+            "originality": 8,
+            "theme": 8
+          },
+          "weighted": 7.6,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/inclusionai/ling-3.2-flash:free"
+        },
+        {
+          "judge": "craftsman",
+          "judgeName": "The Craftsman",
+          "lens": "craft",
+          "scores": {
+            "usefulness": 4,
+            "craft": 4,
+            "originality": 5,
+            "theme": 8
+          },
+          "weighted": 5,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "xai/grok-4.5"
+        },
+        {
+          "judge": "maverick",
+          "judgeName": "The Maverick",
+          "lens": "originality",
+          "scores": {
+            "usefulness": 5,
+            "craft": 8,
+            "originality": 6,
+            "theme": 7
+          },
+          "weighted": 6.4,
+          "critique": "Mock critique: it counts clicks, and it does so with conviction.",
+          "improve": "Mock suggestion: give the user a reason to click.",
+          "model": "openrouter/nvidia/nemotron-3.5-super-vl:free"
+        }
+      ],
+      "abstained": [
+        {
+          "judge": "guest",
+          "judgeName": "Claude Opus 5.5",
+          "reason": "Guest judge could not score both finalists, so neither guest score counts."
+        }
+      ],
+      "judgeAvg": 6.333333333333333,
+      "total": 7.066666666666666,
+      "rank": 2,
+      "guestAttempts": [
+        "Unavailable: mock: the guest could not judge this dish"
+      ]
+    }
+  ],
+  "winner": "gemini-flash",
+  "pressure": null,
+  "eliminated": "cohere-north"
+}

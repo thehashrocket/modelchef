@@ -68,6 +68,10 @@ export interface Entry {
   judgeAvg: number;
   total: number;
   rank: number;
+  /** Finale: a guest score that was removed because the guest could not score both finalists. */
+  discardedGuestScores?: JudgeScore[];
+  /** Finale: earlier guest failure reasons, kept when the final outcome replaced them. */
+  guestAttempts?: string[];
 }
 
 export interface Abstention {
@@ -118,6 +122,10 @@ export interface Episode {
   guestJudge?: string | null;
   /** The model that wrote the guest's brief, when it did. */
   guestBriefModel?: string | null;
+  /** Finale: why the guest judge did not take part (e.g. not enough credit). */
+  guestSkipped?: string | null;
+  /** Finale: why the uneven-guest rule was not applied (dropping would leave a finalist unjudged). */
+  guestRuleSkipped?: string | null;
   immune: string | null;
   entries: Entry[];
   winner: string;

@@ -6,10 +6,12 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Browser } from 'playwright';
 import { capture } from './capture';
+import { decideGuest, readCredit, reconcileGuest, recomputeTotal, type CreditReading } from './finale';
 import { renderShareImage, shareCardFor } from './share-image';
 import {
   CONTESTANTS,
   GUEST_JUDGE,
+  GUEST_MIN_CREDIT_USD,
   JUDGES,
   MYSTERY_THEMES,
   PRESSURE_SPECS,
@@ -109,13 +111,51 @@ async function cook(chef: Contestant, messages: Msg[], path: string): Promise<Co
   }
 }
 
+/** A warning in the log, and on the Actions run page when on GitHub. */
+const warn = (msg: string) => {
+  log(`  WARNING: ${msg}`);
+  if (process.env.GITHUB_ACTIONS) console.log(`::warning::${msg.replace(/\r?\n/g, ' ')}`);
+};
+
+/**
+ * The finale guest's calls share one time budget (cumulative time spent in
+ * guest calls, so cooking and other judging in between never count). Each
+ * call gets a signal that fires when the budget runs out.
+ */
+class GuestBudget {
+  constructor(private remainingMs: number) {}
+  async run<T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    if (this.remainingMs <= 0) throw new Error('the guest judge is out of time');
+    const started = Date.now();
+    try {
+      return await call(AbortSignal.timeout(this.remainingMs));
+    } finally {
+      this.remainingMs -= Date.now() - started;
+    }
+  }
+}
+const GUEST_BUDGET_MS = 15 * 60_000;
+
+/** OpenRouter balance for the guest. The mock never calls the network: MOCK_GUEST_FAIL=balance reads as nearly empty. */
+async function guestCredit(guest: Judge): Promise<CreditReading> {
+  if (process.env.MOCK) {
+    return process.env.MOCK_GUEST_FAIL === 'balance'
+      ? { ok: true, credit: { keyRemaining: 0.4, accountRemaining: 10 } }
+      : { ok: true, credit: { keyRemaining: null, accountRemaining: 100 } };
+  }
+  if (!guest.models.every((m) => m.provider === 'openrouter')) return { ok: false, why: 'the guest is not billed through OpenRouter' };
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) return { ok: false, why: 'OPENROUTER_API_KEY is not set' };
+  return readCredit(key);
+}
+
 const clamp = (v: unknown) => Math.min(10, Math.max(1, Math.round(Number(v)) || 1));
 
-async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefFamily: string, show: ShowContext) {
+async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef: Contestant, show: ShowContext, guestBudget?: GuestBudget) {
   const judges: JudgeScore[] = [];
   const abstained: Entry['abstained'] = [];
   for (const judge of panel) {
-    if (judge.family === chefFamily) {
+    if (judge.family === chef.family) {
       abstained.push({ judge: judge.id, judgeName: judge.name, reason: SAME_FAMILY_REASON });
       continue;
     }
@@ -126,7 +166,10 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chefF
     for (let attempt = 1; attempt <= 2; attempt++) {
       replied = undefined;
       try {
-        const res = await chat(judge.models, judgePrompt(judge, challenge, dish, show), { maxTokens: 8000, temperature: 0.4, kind: 'judge', tag: judge.id });
+        const opts = { maxTokens: 8000, temperature: 0.4, kind: 'judge' as const, tag: `${judge.id}:${chef.id}` };
+        const prompt = judgePrompt(judge, challenge, dish, show);
+        // Only the finale guest runs on a budget.
+        const res = guestBudget && judge.id === GUEST_JUDGE?.id ? await guestBudget.run((signal) => chat(judge.models, prompt, { ...opts, signal })) : await chat(judge.models, prompt, opts);
         replied = modelOf(res);
         const { text } = res;
         const reply = parseJson<{ scores?: Partial<Scores>; critique?: string; improve?: string }>(text);
@@ -200,7 +243,7 @@ async function pressureTest(
     // Kept so the site can say which chef "Dish A" and "Dish B" were in this judge's reason.
     vote.order = [a.id, b.id];
     try {
-      const res = await chat(judge.models, duelPrompt(judge, spec, dishes.get(a.id)!, dishes.get(b.id)!, show), { maxTokens: 8000, temperature: 0.3, kind: 'duel', tag: judge.id });
+      const res = await chat(judge.models, duelPrompt(judge, spec, dishes.get(a.id)!, dishes.get(b.id)!, show), { maxTokens: 8000, temperature: 0.3, kind: 'duel', tag: `${judge.id}:duel` });
       vote.model = modelOf(res);
       const { text } = res;
       const reply = parseJson<{ winner?: string; reason?: string }>(text);
@@ -285,23 +328,41 @@ async function main() {
   }
 
   // Finale: the guest judge sets the brief, and scores both dishes unless they
-  // share a model family with a finalist (then they score neither).
-  const guest = type === 'finale' ? GUEST_JUDGE : null;
+  // share a model family with a finalist (then they score neither). It takes
+  // part only when there is credit for it, and its calls share a time budget.
+  let guest: Judge | null = type === 'finale' ? GUEST_JUDGE : null;
+  let guestSkipped: string | null = null;
   let panel: Judge[] = JUDGES;
   let guestBriefModel: string | null = null;
+  const guestBudget = new GuestBudget(GUEST_BUDGET_MS);
   if (guest) {
-    try {
-      const used = state.episodes.map((e) => e.theme).filter((t): t is string => !!t);
-      const res = await chat(guest.models, guestBriefPrompt(guest, used), { maxTokens: 4000, kind: 'theme' });
-      guestBriefModel = modelOf(res);
-      const { text } = res;
-      const reply = parseJson<{ brief?: string; theme?: string }>(text);
-      theme = String(reply.brief ?? reply.theme ?? '').trim().slice(0, 240) || null;
-    } catch (err) {
-      log(`  Guest judge could not set a brief (${(err as Error).message.slice(0, 160)}); the finale runs without one.`);
+    const decision = decideGuest(await guestCredit(guest), GUEST_MIN_CREDIT_USD);
+    if (!decision.run) {
+      guestSkipped = decision.reason;
+      warn(`${decision.reason} The finale runs on schedule without the guest judge.`);
+      guest = null;
+    } else if (decision.warning) warn(decision.warning);
+  }
+  if (guest) {
+    const g = guest;
+    const used = state.episodes.map((e) => e.theme).filter((t): t is string => !!t);
+    const failures: string[] = [];
+    // One retry. An empty brief counts as a failed attempt.
+    for (let attempt = 1; attempt <= 2 && !theme; attempt++) {
+      try {
+        const res = await guestBudget.run((signal) => chat(g.models, guestBriefPrompt(g, used), { maxTokens: 4000, kind: 'brief', signal }));
+        guestBriefModel = modelOf(res);
+        const reply = parseJson<{ brief?: string; theme?: string }>(res.text);
+        const brief = String(reply.brief ?? reply.theme ?? '').trim().slice(0, 240);
+        if (!brief) throw new Error('the reply has no brief');
+        theme = brief;
+      } catch (err) {
+        failures.push((err as Error).message.slice(0, 160));
+      }
     }
-    if (active.some((c) => c.family === guest.family)) log(`  ${guest.name} shares a model family with a finalist, so sets the brief but does not score.`);
-    else panel = [...JUDGES, guest];
+    if (!theme) warn(`The guest judge could not set a brief (${failures.join(' | ')}); the finale runs with the default brief.`);
+    if (active.some((c) => c.family === g.family)) log(`  ${g.name} shares a model family with a finalist, so sets the brief but does not score.`);
+    else panel = [...JUDGES, g];
   }
   const challenge: Challenge = { type, theme, ingredient: ingredient?.text ?? null, guest: guest?.name ?? null };
   const show = showContext(state, n);
@@ -315,6 +376,7 @@ async function main() {
   const labels = shuffle([...'ABCDEFGHIJKLMNOP'].slice(0, active.length));
   const entries: Entry[] = [];
   let pressure: PressureTest | null = null;
+  let guestRuleSkipped: string | null = null;
 
   // Set CHROME_PATH to use an installed Chrome instead of Playwright's download.
   const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
@@ -346,7 +408,7 @@ async function main() {
       const { mech, shots } = await capture(browser, path, join(dir, 'shots', chef.id), { ...cooked, ingredient });
       entry.mech = mech;
       const dish: Dish = { label: entry.label, title: entry.title, pitch: entry.pitch, presentation: entry.presentation, mech, source: readFileSync(path, 'utf8'), shots };
-      Object.assign(entry, await judgeDish(panel, challenge, dish, chef.family, show));
+      Object.assign(entry, await judgeDish(panel, challenge, dish, chef, show, guestBudget));
       if (!entry.judges.length) {
         throw new Error(`No judge could score ${chef.id} (${entry.abstained.map((a) => a.reason).join('; ')}). Episode not recorded.`);
       }
@@ -356,6 +418,16 @@ async function main() {
     }
 
     if (entries.every((e) => e.forfeit)) throw new Error('Every chef forfeited. Check API keys and model IDs (pnpm check-models). Episode not recorded.');
+
+    // Finale: a guest who scored only one finalist must not decide the season by itself.
+    if (guest && panel.includes(guest)) {
+      const outcome = reconcileGuest(entries, guest.id, (e) => recomputeTotal(e, SCORING.judgeWeight, SCORING.mechanicalWeight));
+      if (outcome.kind === 'discarded') warn(`The guest judge scored only ${outcome.chef}, so neither finalist's guest score counts. Totals were recomputed from the regular panel.`);
+      if (outcome.kind === 'retained') {
+        guestRuleSkipped = `dropping the guest would leave ${outcome.scored} unjudged`;
+        warn(`The guest judge scored only ${outcome.scored}, and no other judge did; the guest's score was kept.`);
+      }
+    }
 
     entries.sort((a, b) => b.total - a.total || (b.mech?.score ?? 0) - (a.mech?.score ?? 0));
     entries.forEach((e, i) => (e.rank = i + 1));
@@ -431,6 +503,7 @@ async function main() {
     brief: challengeText(challenge),
     guestJudge: guest?.name ?? null,
     guestBriefModel,
+    ...(type === 'finale' ? { guestSkipped, guestRuleSkipped } : {}),
     immune,
     entries,
     winner,
