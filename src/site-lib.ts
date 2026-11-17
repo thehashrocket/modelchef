@@ -165,11 +165,20 @@ const prov = (text: string) => `<small class="prov">${text}</small>`;
 /** Which model stood behind a judge's score, vote or abstention. */
 export function provenance(ep: Episode, x: JudgeScore | DuelVote | Abstention): string {
   if ('reason' in x && isSameFamily(x.reason)) return '';
-  if (!keepsModels(ep)) return prov('model not recorded');
+  // Said once per episode by modelsNote(), not under every note.
+  if (!keepsModels(ep)) return '';
   const scored = 'scores' in x || ('winner' in x && x.winner !== null);
   if (x.model) return prov(scored ? `judged by ${esc(x.model)}` : `reply from ${esc(x.model)} could not be read`);
   return prov('no model answered');
 }
+
+/** One line for episodes recorded before judge models were kept. Empty otherwise. */
+export function modelsNote(ep: Episode): string {
+  return keepsModels(ep) ? '' : `<p class="sub note">This episode was recorded before ModelChef kept which model answered for each judge.</p>`;
+}
+
+/** Older records cut critiques mid-sentence; mark the cut instead of letting it read as finished. */
+export const shownCritique = (text: string) => (/[.!?…]["'”’)\]]*\s*$/.test(text) || !text.trim() ? text : `${text.trimEnd()}…`);
 
 // ---------------------------------------------------------------------------
 // The recap: what happened in an episode, in one or two sentences, from data.
@@ -307,7 +316,7 @@ export function notesBlock(ep: Episode, e: Entry, open: boolean): string {
     e.judges
       .map(
         (j) =>
-          `<blockquote><b>${monogram(j.judge, j.judgeName)}${esc(j.judgeName)} · ${j.weighted.toFixed(1)}</b>${esc(j.critique)}<br><small>Use ${j.scores.usefulness} · Craft ${j.scores.craft} · Originality ${j.scores.originality} · Theme ${j.scores.theme}</small>${provenance(ep, j)}</blockquote>`,
+          `<blockquote><b>${monogram(j.judge, j.judgeName)}${esc(j.judgeName)} · ${j.weighted.toFixed(1)}</b>${esc(shownCritique(j.critique))}<br><small>Use ${j.scores.usefulness} · Craft ${j.scores.craft} · Originality ${j.scores.originality} · Theme ${j.scores.theme}</small>${provenance(ep, j)}</blockquote>`,
       )
       .join('') +
     e.abstained
@@ -440,7 +449,7 @@ export function episodeBlock(season: string, ep: Episode, root = ''): string {
   const winner = ep.entries.find((e) => e.contestant === ep.winner);
   const rest = ep.entries.filter((e) => e.contestant !== ep.winner);
   return `<h2 id="${esc(epAnchor(season, ep))}">${title}: ${TYPE_LABEL[ep.type]}${theme}</h2>
-<p class="sub">${esc(fmtDate(ep.date))}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}${guestNotes(ep)}
+<p class="sub">${esc(fmtDate(ep.date))}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}${guestNotes(ep)}${modelsNote(ep)}
 <p class="recap">${recapHtml(season, ep)}</p>
 ${winner ? featuredCard(season, ep, winner, root) : ''}
 ${briefBlock(ep)}
@@ -479,6 +488,7 @@ export function dishChrome(
     const panel = `${e.contestant === ep.winner ? guestNotes(ep) : ''}${e.pitch ? `<p class="pitch">${esc(e.pitch)}</p>` : ''}
 ${e.judges.length ? notesBlock(ep, e, true) : '<p>Not judged.</p>'}
 ${mechLine(e.mech, ep)}
+${modelsNote(ep)}
 ${footer}`;
     return { bar, panel };
   }
@@ -495,6 +505,7 @@ ${footer}`;
   const panel = `<p><b>The spec:</b> ${esc(p.spec)}</p>
 <p>Picked by ${picks} of ${p.votes.length} judge${p.votes.length === 1 ? '' : 's'}.</p>
 ${votes ? `<ul class="votes">${votes}</ul>` : ''}
+${modelsNote(ep)}
 <p><b>${esc(chef)} ${p.eliminated === id ? 'went home' : 'survived the pressure test'}.</b></p>
 ${footer}`;
   return { bar, panel };

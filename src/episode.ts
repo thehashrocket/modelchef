@@ -24,7 +24,7 @@ import {
   type Judge,
   type SecretIngredient,
 } from './config';
-import { chat, extractHtml, parseJson, type ChatResult } from './llm';
+import { chat, clipSentences, extractHtml, parseJson, type ChatResult } from './llm';
 import { challengeText, cookPrompt, duelPrompt, guestBriefPrompt, judgePrompt, pressurePrompt, themePrompt, type Challenge, type Dish, type ShowContext } from './prompts';
 import {
   episodeDir,
@@ -168,6 +168,7 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef:
     let replied: string | undefined;
     for (let attempt = 1; attempt <= 2; attempt++) {
       replied = undefined;
+      let raw = '';
       try {
         const opts = { maxTokens: 8000, temperature: 0.4, kind: 'judge' as const, tag: `${judge.id}:${chef.id}` };
         const prompt = judgePrompt(judge, challenge, dish, show);
@@ -175,6 +176,7 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef:
         const res = guestBudget && judge.id === GUEST_JUDGE?.id ? await guestBudget.run((signal) => chat(judge.models, prompt, { ...opts, signal })) : await chat(judge.models, prompt, opts);
         replied = modelOf(res);
         const { text } = res;
+        raw = text;
         const reply = parseJson<{ scores?: Partial<Scores>; critique?: string; improve?: string }>(text);
         if (!reply.scores) throw new Error('reply has no scores');
         const scores: Scores = {
@@ -191,14 +193,16 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef:
           lens: judge.lens,
           scores,
           weighted,
-          critique: String(reply.critique ?? '').slice(0, 600),
-          improve: String(reply.improve ?? '').slice(0, 300),
+          critique: clipSentences(String(reply.critique ?? ''), 600),
+          improve: clipSentences(String(reply.improve ?? ''), 300),
           model: replied,
         });
         failure = '';
         break;
       } catch (err) {
         failure = (err as Error).message.slice(0, 200);
+        // The record keeps only the error; the raw reply goes to the run log so the next one can be diagnosed.
+        if (raw) console.warn(`[${judge.id}:${chef.id}] unreadable reply (attempt ${attempt}, ${replied}): ${raw.slice(0, 4000)}`);
       }
     }
     if (failure) abstained.push({ judge: judge.id, judgeName: judge.name, reason: `Unavailable: ${failure}`, ...(replied ? { model: replied } : {}) });
