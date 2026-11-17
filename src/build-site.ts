@@ -34,6 +34,7 @@ import {
   type DishLink,
   type FeedItem,
   type MetaInput,
+  noPressureDish,
 } from './site-lib';
 import { average, type Entry, type Episode, type SeasonState } from './state';
 
@@ -405,7 +406,7 @@ function siteHeader(opts: { compact: boolean; root: string; status?: string; lat
 
 function siteFooter(repo: string | undefined, root = ''): string {
   return `<footer><p>Model output and scores are never edited. Recaps and labels are generated from the episode record by code.</p>
-<p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}"${evAttrs('outbound', { target: 'github' })}>github.com/${esc(repo)}</a>.` : ''}</p>
+<p>Dishes run in a sandbox with the network blocked, so apps that expect browser storage keep their state in memory. A judge from the same lab as a chef sits that dish out. If a chef&rsquo;s provider never answers, that chef sits the episode out: no score, and it can&rsquo;t be sent home.${repo ? ` Source, prompts and every score: <a href="https://github.com/${esc(repo)}"${evAttrs('outbound', { target: 'github' })}>github.com/${esc(repo)}</a>.` : ''}</p>
 <p class="maker">ModelChef is a side project by <a href="https://jasonshultz.com">Jason Shultz</a>, a human who builds web apps for clients. No judges were harmed.</p>${FEED ? `\n<p><a href="${root}feed.xml"${evAttrs('outbound', { target: 'feed' })}>Episode feed (Atom)</a></p>` : ''}${GA_ID ? `\n<p><button type="button" class="linkish" data-consent-open>Cookie settings</button></p>` : ''}</footer>`;
 }
 
@@ -471,7 +472,7 @@ function publishEpisode(season: string, ep: Episode, prev: Episode | undefined, 
   });
   const p = ep.pressure;
   for (const id of p?.chefs ?? []) {
-    if (p!.forfeits[id]) continue;
+    if (noPressureDish(p!, id)) continue;
     writeFileSync(join(out, 'pressure', `${id}.html`), lockDown(readFileSync(join(src, 'pressure', `${id}.html`), 'utf8')));
     const pageTitle = `Pressure test: ${chefName(id)} · ModelChef`;
     const meta = share(
@@ -482,7 +483,7 @@ function publishEpisode(season: string, ep: Episode, prev: Episode | undefined, 
     );
     // The other chef's dish, when there was one.
     const otherId = p!.chefs.find((c) => c !== id);
-    const other = otherId && !p!.forfeits[otherId] ? { href: `play-pressure-${otherId}.html`, label: chefName(otherId) } : undefined;
+    const other = otherId && !noPressureDish(p!, otherId) ? { href: `play-pressure-${otherId}.html`, label: chefName(otherId) } : undefined;
     const chrome = dishChrome(season, ep, { pressureChef: id, other });
     writeFileSync(join(out, `play-pressure-${id}.html`), playPage({ title: 'Pressure test', pageTitle, ...chrome, src: `pressure/${id}.html`, meta }));
   }
@@ -585,7 +586,7 @@ ${siteFooter(repo)}`;
       const base = `/${epPath(season, ep)}`;
       urls.push({ path: `${base}/`, lastmod: ep.date });
       for (const e of ep.entries) if (!e.forfeit) urls.push({ path: `${base}/play-${e.contestant}.html`, lastmod: ep.date });
-      for (const id of ep.pressure?.chefs ?? []) if (!ep.pressure!.forfeits[id]) urls.push({ path: `${base}/play-pressure-${id}.html`, lastmod: ep.date });
+      for (const id of ep.pressure?.chefs ?? []) if (!noPressureDish(ep.pressure!, id)) urls.push({ path: `${base}/play-pressure-${id}.html`, lastmod: ep.date });
     }
     writeFileSync(join(OUT, 'sitemap.xml'), sitemapXml(SITE_URL, urls));
     console.log(`[modelchef] sitemap: dist/sitemap.xml (${urls.length} URLs)`);

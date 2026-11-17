@@ -392,3 +392,21 @@ describe('guestNotes', () => {
   });
   it('is empty otherwise', () => assert.equal(guestNotes(episode(null)), ''));
 });
+
+describe('sit-out rule', async () => {
+  const { noPressureDish, satOutNote, recapText } = await import('./site-lib');
+  const p: PressureTest = { spec: 's', chefs: ['gpt-oss', 'ernie'], forfeits: {}, satOut: { 'gpt-oss': 'No provider answered: HTTP 503' }, votes: [], eliminated: 'ernie', decidedBy: 'main-round score' };
+  it('a chef whose provider was down has no pressure dish page', () => {
+    assert.equal(noPressureDish(p, 'gpt-oss'), true);
+    assert.equal(noPressureDish(p, 'ernie'), false);
+  });
+  it('the episode says who sat out, once, and older records say nothing', () => {
+    const ep = { satOut: [{ contestant: 'gemini-flash', reason: 'No provider answered: HTTP 503' }] } as unknown as Episode;
+    assert.match(satOutNote(ep), /sat out: its provider never answered, so no score and no elimination/);
+    assert.equal(satOutNote({} as Episode), '');
+  });
+  it('the recap blames the outage, not the chef, when the pressure test could not run', () => {
+    const ep = { number: 2, type: 'mystery-box', winner: 'nemotron', eliminated: 'ernie', entries: [entry('nemotron', 8, { rank: 1 })], pressure: p } as unknown as Episode;
+    assert.match(recapText('season-01', ep), /couldn't run because .*provider didn't answer, so the main-round score sent .* home/);
+  });
+});

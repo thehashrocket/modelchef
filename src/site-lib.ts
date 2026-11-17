@@ -5,7 +5,7 @@
 import { CONTESTANTS, GUEST_JUDGE, JUDGES, SCORING, type Judge } from './config';
 import { guestKeptNote } from './finale';
 import { challengeText, RULES } from './prompts';
-import { GUEST_UNEVEN_REASON, isPilot, SAME_FAMILY_REASON, seasonLabel, TYPE_LABEL, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type MechReport } from './state';
+import { GUEST_UNEVEN_REASON, isPilot, SAME_FAMILY_REASON, seasonLabel, TYPE_LABEL, type Abstention, type DuelVote, type Entry, type Episode, type JudgeScore, type MechReport, type PressureTest } from './state';
 
 export const esc = (s: unknown) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -172,6 +172,19 @@ export function provenance(ep: Episode, x: JudgeScore | DuelVote | Abstention): 
   return prov('no model answered');
 }
 
+/** True when a pressure-test chef has no dish to show: a forfeit, or its provider never answered. */
+export const noPressureDish = (p: PressureTest, id: string) => !!(p.forfeits[id] || p.satOut?.[id]);
+
+/** Chefs whose provider never answered, so they did not cook. Empty for most episodes. */
+export function satOutNote(ep: Episode): string {
+  const out = ep.satOut ?? [];
+  if (!out.length) return '';
+  const names = out.map((s) => chefName(s.contestant));
+  const who = names.length === 1 ? names[0]! : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  const title = out.map((s) => `${chefName(s.contestant)}: ${s.reason}`).join('\n');
+  return `<p class="sub note" title="${esc(title)}">${esc(who)} sat out: ${names.length === 1 ? 'its provider' : 'their providers'} never answered, so no score and no elimination this week.</p>`;
+}
+
 /** One line for episodes recorded before judge models were kept. Empty otherwise. */
 export function modelsNote(ep: Episode): string {
   return keepsModels(ep) ? '' : `<p class="sub note">This episode was recorded before ModelChef kept which model answered for each judge.</p>`;
@@ -213,7 +226,10 @@ function recapParts(season: string, ep: Episode): [string] | [string, string] {
   const tally = counted(ep);
   const votesFor = (id: string) => tally.get(id) ?? 0;
   let second: string;
-  if (p.decidedBy === 'votes') {
+  if (p.satOut) {
+    const down = Object.keys(p.satOut).map(chefName).join(' and ');
+    second = `The pressure test couldn't run because ${down}'s provider didn't answer, so the main-round score sent ${out} home.`;
+  } else if (p.decidedBy === 'votes') {
     const w = Math.max(...tally.values());
     const l = Math.min(...tally.values());
     second = `${out} lost the pressure test ${w}–${l} to ${survivor} and went home.`;
@@ -398,11 +414,12 @@ export function pressureBlock(season: string, ep: Episode, root = ''): string {
   if (!p) return '';
   const base = `${root}${epPath(season, ep)}`;
   const how =
-    p.decidedBy === 'votes' ? 'The judges voted.'
+    p.satOut ? 'A provider did not answer, so the main-round score decided it.'
+    : p.decidedBy === 'votes' ? 'The judges voted.'
     : p.decidedBy === 'forfeit' ? 'The other chef failed to serve a dish.'
     : 'The judges could not separate them, so the main-round score decided it.';
   const dishes = p.chefs
-    .map((id) => (p.forfeits[id] ? `${esc(chefName(id))} (no dish)` : `<a href="${base}/play-pressure-${id}.html">${esc(chefName(id))}</a>`))
+    .map((id) => (p.satOut?.[id] ? `${esc(chefName(id))} (provider down)` : p.forfeits[id] ? `${esc(chefName(id))} (no dish)` : `<a href="${base}/play-pressure-${id}.html">${esc(chefName(id))}</a>`))
     .join(' vs ');
   const votes = p.votes
     .map((v) => voteItem(ep, v))
@@ -449,7 +466,7 @@ export function episodeBlock(season: string, ep: Episode, root = ''): string {
   const winner = ep.entries.find((e) => e.contestant === ep.winner);
   const rest = ep.entries.filter((e) => e.contestant !== ep.winner);
   return `<h2 id="${esc(epAnchor(season, ep))}">${title}: ${TYPE_LABEL[ep.type]}${theme}</h2>
-<p class="sub">${esc(fmtDate(ep.date))}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}${guestNotes(ep)}${modelsNote(ep)}
+<p class="sub">${esc(fmtDate(ep.date))}.${by} ${ep.entries.length} dishes, judged blind.</p>${twist}${guestNotes(ep)}${satOutNote(ep)}${modelsNote(ep)}
 <p class="recap">${recapHtml(season, ep)}</p>
 ${winner ? featuredCard(season, ep, winner, root) : ''}
 ${briefBlock(ep)}
