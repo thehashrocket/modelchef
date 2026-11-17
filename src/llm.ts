@@ -19,6 +19,25 @@ export interface ChatOpts {
   tag?: string;
   /** Cancels the call, including its retries and backoff waits (the finale guest's time budget). */
   signal?: AbortSignal;
+  /**
+   * How long to keep coming back when no provider answers at all (rate limits, server
+   * errors, network failures). 0, the default, gives up after one pass over the models.
+   */
+  patienceMs?: number;
+}
+
+/**
+ * Thrown when no model produced a usable reply. `answered` says whether any provider
+ * actually replied (with an empty message); false means none of them answered at all.
+ */
+export class ChatError extends Error {
+  constructor(
+    message: string,
+    readonly answered: boolean,
+  ) {
+    super(message);
+    this.name = 'ChatError';
+  }
 }
 
 export interface ChatResult {
@@ -70,62 +89,82 @@ export async function chat(
   // MOCK_FALLBACK=1 answers from the second model in the list, to exercise fallbacks without keys.
   if (process.env.MOCK) {
     opts.signal?.throwIfAborted();
+    // MOCK_OUTAGE=<chef ids>: those chefs' providers never answer, to exercise the sit-out rule.
+    const outage = (process.env.MOCK_OUTAGE ?? '').split(',').filter(Boolean);
+    if (opts.kind === 'cook' && opts.tag && outage.includes(opts.tag)) throw new ChatError(`mock outage for ${opts.tag}`, false);
     return { text: mockChat(messages, opts), used: (process.env.MOCK_FALLBACK && models[1]) || models[0]!, stop: 'stop' };
   }
   const signal = opts.signal;
 
-  const errors: string[] = [];
-  for (const ref of models) {
-    const provider = PROVIDERS[ref.provider];
-    const key = process.env[provider.keyEnv];
-    if (!key) {
-      errors.push(`${ref.provider}: ${provider.keyEnv} is not set`);
-      continue;
-    }
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      signal?.throwIfAborted();
-      await pace(ref.provider);
-      signal?.throwIfAborted();
-      try {
-        const res = await fetch(`${provider.baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-          body: JSON.stringify({
-            model: ref.model,
-            messages,
-            max_tokens: opts.maxTokens,
-            temperature: opts.temperature ?? 0.8,
-          }),
-          signal: signal ? AbortSignal.any([AbortSignal.timeout(300_000), signal]) : AbortSignal.timeout(300_000),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { choices?: { finish_reason?: string; message?: { content?: unknown } }[] };
-          const choice = data.choices?.[0];
-          const text = choice?.message?.content;
-          // `stop` says why the model stopped: "length" means it hit max_tokens.
-          const stop = String(choice?.finish_reason ?? 'unknown');
-          if (typeof text === 'string' && text.trim()) return { text, used: ref, stop };
-          // An empty reply is usually a blip, or a thinking model that spent its
-          // whole budget before writing anything. Worth another attempt.
-          errors.push(`${ref.provider}/${ref.model}: empty reply (stop reason: ${stop})`);
+  const started = Date.now();
+  const patience = opts.patienceMs ?? 0;
+  // Did any provider reply at all, even with nothing in it? Kept across rounds.
+  let answered = false;
+  let errors: string[] = [];
+  for (let round = 1; ; round++) {
+    errors = [];
+    // Only rate limits, server errors and network failures are worth waiting out.
+    let transient = false;
+    for (const ref of models) {
+      const provider = PROVIDERS[ref.provider];
+      const key = process.env[provider.keyEnv];
+      if (!key) {
+        errors.push(`${ref.provider}: ${provider.keyEnv} is not set`);
+        continue;
+      }
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        signal?.throwIfAborted();
+        await pace(ref.provider);
+        signal?.throwIfAborted();
+        try {
+          const res = await fetch(`${provider.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+            body: JSON.stringify({
+              model: ref.model,
+              messages,
+              max_tokens: opts.maxTokens,
+              temperature: opts.temperature ?? 0.8,
+            }),
+            signal: signal ? AbortSignal.any([AbortSignal.timeout(300_000), signal]) : AbortSignal.timeout(300_000),
+          });
+          if (res.ok) {
+            const data = (await res.json()) as { choices?: { finish_reason?: string; message?: { content?: unknown } }[] };
+            const choice = data.choices?.[0];
+            const text = choice?.message?.content;
+            // `stop` says why the model stopped: "length" means it hit max_tokens.
+            const stop = String(choice?.finish_reason ?? 'unknown');
+            if (typeof text === 'string' && text.trim()) return { text, used: ref, stop };
+            // An empty reply is usually a blip, or a thinking model that spent its
+            // whole budget before writing anything. Worth another attempt.
+            answered = true;
+            errors.push(`${ref.provider}/${ref.model}: empty reply (stop reason: ${stop})`);
+            await wait(attempt * 5_000, signal);
+            continue;
+          }
+          const body = (await res.text()).replace(/\s+/g, ' ').slice(0, 300);
+          errors.push(`${ref.provider}/${ref.model}: HTTP ${res.status} ${body}`);
+          if (res.status !== 429 && res.status < 500) break;
+          transient = true;
+          const retryAfter = Number(res.headers.get('retry-after'));
+          const backoff = retryAfter > 0 ? retryAfter * 1000 : attempt * 20_000;
+          await wait(Math.min(backoff, 90_000), signal);
+        } catch (err) {
+          // Out of budget: stop now, with no more retries or fallbacks.
+          if (signal?.aborted) throw new Error(`stopped: ${String((signal.reason as Error)?.message ?? signal.reason)} (${errors.join(' | ') || 'no reply yet'})`);
+          errors.push(`${ref.provider}/${ref.model}: ${(err as Error).message}`);
+          transient = true;
           await wait(attempt * 5_000, signal);
-          continue;
         }
-        const body = (await res.text()).replace(/\s+/g, ' ').slice(0, 300);
-        errors.push(`${ref.provider}/${ref.model}: HTTP ${res.status} ${body}`);
-        if (res.status !== 429 && res.status < 500) break;
-        const retryAfter = Number(res.headers.get('retry-after'));
-        const backoff = retryAfter > 0 ? retryAfter * 1000 : attempt * 20_000;
-        await wait(Math.min(backoff, 90_000), signal);
-      } catch (err) {
-        // Out of budget: stop now, with no more retries or fallbacks.
-        if (signal?.aborted) throw new Error(`stopped: ${String((signal.reason as Error)?.message ?? signal.reason)} (${errors.join(' | ') || 'no reply yet'})`);
-        errors.push(`${ref.provider}/${ref.model}: ${(err as Error).message}`);
-        await wait(attempt * 5_000, signal);
       }
     }
+    // A model that replied, even emptily, is cooking: no outage to wait out.
+    const pause = Math.min(60_000 * 2 ** (round - 1), 240_000);
+    if (answered || !transient || Date.now() - started + pause > patience) break;
+    console.warn(`[modelchef] ${opts.tag ?? opts.kind}: no provider answered (round ${round}); trying again in ${pause / 1000}s`);
+    await wait(pause, signal);
   }
-  throw new Error(errors.join(' | ') || 'no models configured');
+  throw new ChatError(errors.join(' | ') || 'no models configured', answered);
 }
 
 /** Index of the brace that closes the object opening at `start`, or -1. Skips braces inside strings. */

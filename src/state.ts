@@ -105,6 +105,8 @@ export interface PressureTest {
   spec: string;
   chefs: string[];
   forfeits: Record<string, string>;
+  /** Chefs whose provider never answered during the pressure test. Any entry means the main round decided it. */
+  satOut?: Record<string, string>;
   votes: DuelVote[];
   eliminated: string;
   decidedBy: 'votes' | 'forfeit' | 'main-round score';
@@ -129,6 +131,11 @@ export interface Episode {
   /** Finale: why the uneven-guest rule was not applied (dropping would leave a finalist unjudged). */
   guestRuleSkipped?: string | null;
   immune: string | null;
+  /**
+   * Chefs whose provider never answered, so they did not cook this episode: no entry,
+   * no score, and they could not be eliminated. Absent in older records.
+   */
+  satOut?: { contestant: string; reason: string }[];
   entries: Entry[];
   winner: string;
   pressure: PressureTest | null;

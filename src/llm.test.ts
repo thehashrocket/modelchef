@@ -35,3 +35,18 @@ it('clipSentences leaves short text alone and cuts long text at a sentence end',
   const cut = clipSentences(noStop, 50);
   assert.ok(cut.endsWith('…') && cut.length <= 50, cut);
 });
+
+it('chat reports that no provider answered when none could be called', async () => {
+  const { chat, ChatError } = await import('./llm');
+  const saved = { ...process.env };
+  for (const k of ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'XAI_API_KEY']) delete process.env[k];
+  delete process.env.MOCK;
+  try {
+    await assert.rejects(
+      chat([{ provider: 'groq', model: 'x' }] as never, [{ role: 'user', content: 'hi' }], { maxTokens: 10, kind: 'ping', patienceMs: 600_000 }),
+      (err: unknown) => err instanceof ChatError && err.answered === false,
+    );
+  } finally {
+    Object.assign(process.env, saved);
+  }
+});

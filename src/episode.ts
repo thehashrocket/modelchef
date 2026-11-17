@@ -24,7 +24,7 @@ import {
   type Judge,
   type SecretIngredient,
 } from './config';
-import { chat, clipSentences, extractHtml, parseJson, type ChatResult } from './llm';
+import { chat, ChatError, clipSentences, extractHtml, parseJson, type ChatResult } from './llm';
 import { challengeText, cookPrompt, duelPrompt, guestBriefPrompt, judgePrompt, pressurePrompt, themePrompt, type Challenge, type Dish, type ShowContext } from './prompts';
 import {
   episodeDir,
@@ -75,6 +75,8 @@ function readPresentation(reply: string): string {
 interface Cooked {
   chef: Contestant;
   forfeit: string | null;
+  /** Set when no provider answered at all: the chef sits out instead of forfeiting. */
+  sitOut: string | null;
   model: string | null;
   path: string;
   title: string;
@@ -84,10 +86,18 @@ interface Cooked {
   hasDescription: boolean;
 }
 
+/**
+ * How long a chef's kitchen waits out a provider that is not answering at all before the
+ * chef sits the episode out. Providers do not bill failed calls, so waiting costs only time.
+ */
+const COOK_PATIENCE_MS = Number(process.env.COOK_PATIENCE_MS ?? 10 * 60_000);
+/** More chefs than this sitting out in one episode means the episode is not recorded. */
+const MAX_SAT_OUT = 2;
+
 async function cook(chef: Contestant, messages: Msg[], path: string): Promise<Cooked> {
-  const base = { chef, path, model: null, title: 'No dish', pitch: '', presentation: '', hasTitle: false, hasDescription: false };
+  const base = { chef, path, model: null, sitOut: null, title: 'No dish', pitch: '', presentation: '', hasTitle: false, hasDescription: false };
   try {
-    const { text, used, stop } = await chat(chef.models, messages, { maxTokens: chef.maxTokens, kind: 'cook', tag: chef.id });
+    const { text, used, stop } = await chat(chef.models, messages, { maxTokens: chef.maxTokens, kind: 'cook', tag: chef.id, patienceMs: COOK_PATIENCE_MS });
     const html = extractHtml(text);
     const model = `${used.provider}/${used.model}`;
     if (!html) {
@@ -110,6 +120,9 @@ async function cook(chef: Contestant, messages: Msg[], path: string): Promise<Co
       hasDescription: !!meta.pitch,
     };
   } catch (err) {
+    // No provider answered at all: an outage, not a bad dish. The chef sits out.
+    if (err instanceof ChatError && !err.answered) return { ...base, forfeit: null, sitOut: `No provider answered: ${err.message.slice(0, 300)}` };
+    // A model that replied but never served a dish forfeits, as before.
     return { ...base, forfeit: `Model unavailable: ${(err as Error).message.slice(0, 300)}` };
   }
 }
@@ -225,6 +238,10 @@ async function pressureTest(
   for (const chef of chefs) {
     const path = join(dir, 'pressure', `${chef.id}.html`);
     const cooked = await cook(chef, pressurePrompt(chef, spec), path);
+    if (cooked.sitOut) {
+      (result.satOut ??= {})[chef.id] = cooked.sitOut;
+      continue;
+    }
     if (cooked.forfeit) {
       result.forfeits[chef.id] = cooked.forfeit;
       continue;
@@ -233,6 +250,8 @@ async function pressureTest(
     dishes.set(chef.id, { label: '', title: cooked.title, pitch: cooked.pitch, presentation: '', mech, source: readFileSync(path, 'utf8'), shots });
   }
 
+  // An outage in the pressure test cannot send anyone home: the main round decides.
+  if (result.satOut) return result;
   const forfeited = chefs.filter((c) => result.forfeits[c.id]);
   if (forfeited.length === 1) return { ...result, eliminated: forfeited[0]!.id, decidedBy: 'forfeit' };
   if (forfeited.length === 2) return result;
@@ -387,6 +406,7 @@ async function main() {
 
   const labels = shuffle([...'ABCDEFGHIJKLMNOP'].slice(0, active.length));
   const entries: Entry[] = [];
+  const satOut: { contestant: string; reason: string }[] = [];
   let pressure: PressureTest | null = null;
   let guestRuleSkipped: string | null = null;
 
@@ -396,6 +416,14 @@ async function main() {
     for (const [i, chef] of active.entries()) {
       const path = join(dir, 'apps', `${chef.id}.html`);
       const cooked = await cook(chef, cookPrompt(chef, n, challenge, state), path);
+      if (cooked.sitOut) {
+        satOut.push({ contestant: chef.id, reason: cooked.sitOut });
+        warn(`${chef.id} sits out: ${cooked.sitOut}`);
+        if (satOut.length > MAX_SAT_OUT) {
+          throw new Error(`${satOut.length} chefs' providers did not answer (${satOut.map((s) => s.contestant).join(', ')}). Episode not recorded; run it again later.`);
+        }
+        continue;
+      }
       const entry: Entry = {
         contestant: chef.id,
         label: `Dish ${labels[i]}`,
@@ -444,9 +472,15 @@ async function main() {
     entries.sort((a, b) => b.total - a.total || (b.mech?.score ?? 0) - (a.mech?.score ?? 0));
     entries.forEach((e, i) => (e.rank = i + 1));
 
+    if (type === 'finale' && satOut.length) {
+      throw new Error(`A finalist's provider did not answer (${satOut.map((s) => s.contestant).join(', ')}). A champion is not crowned by an outage. Episode not recorded; run it again later.`);
+    }
     if (type !== 'finale') {
       // The episode winner and the immune chef are safe; the two lowest of the rest cook again.
       const atRisk = entries.filter((e, i) => i > 0 && e.contestant !== immune).slice(-2);
+      if (atRisk.length < 2) {
+        throw new Error(`Too few chefs cooked for a pressure test (${satOut.length} sat out). Episode not recorded; run it again later.`);
+      }
       const chefs = atRisk.map((e) => active.find((c) => c.id === e.contestant)!) as [Contestant, Contestant];
       log(`  Pressure test: ${chefs[0].id} vs ${chefs[1].id}`);
       pressure = await pressureTest(browser, dir, chefs, show);
@@ -517,6 +551,7 @@ async function main() {
     guestBriefModel,
     ...(type === 'finale' ? { guestSkipped, guestRuleSkipped } : {}),
     immune,
+    ...(satOut.length ? { satOut } : {}),
     entries,
     winner,
     pressure,
