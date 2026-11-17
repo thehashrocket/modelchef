@@ -128,12 +128,8 @@ export async function chat(
   throw new Error(errors.join(' | ') || 'no models configured');
 }
 
-/** Pulls the first JSON object out of a reply that may be wrapped in prose or fences. */
-export function parseJson<T>(text: string): T {
-  const start = text.indexOf('{');
-  if (start < 0) throw new Error('no JSON object in reply');
-  // Walk to the brace that closes the first object, so prose, code fences or a
-  // second object after it cannot break the parse.
+/** Index of the brace that closes the object opening at `start`, or -1. Skips braces inside strings. */
+function closingBrace(text: string, start: number): number {
   let depth = 0;
   let inString = false;
   for (let i = start; i < text.length; i++) {
@@ -143,9 +139,47 @@ export function parseJson<T>(text: string): T {
       else if (ch === '"') inString = false;
     } else if (ch === '"') inString = true;
     else if (ch === '{') depth++;
-    else if (ch === '}' && --depth === 0) return JSON.parse(text.slice(start, i + 1)) as T;
+    else if (ch === '}' && --depth === 0) return i;
   }
-  throw new Error('JSON object in reply is not closed');
+  return -1;
+}
+
+/**
+ * Pulls the first JSON object out of a reply that may be wrapped in prose or fences.
+ * A reply that parsed before still parses to the same object: the fallbacks only run
+ * where the first candidate fails, so they can rescue a reply but never change one.
+ */
+export function parseJson<T>(text: string): T {
+  let start = text.indexOf('{');
+  if (start < 0) throw new Error('no JSON object in reply');
+  let firstError: Error | null = null;
+  // Try the first balanced object; if it will not parse, try the next opening brace.
+  while (start >= 0) {
+    const end = closingBrace(text, start);
+    const candidate = end < 0 ? text.slice(start) : text.slice(start, end + 1);
+    try {
+      return JSON.parse(candidate) as T;
+    } catch (err) {
+      firstError ??= end < 0 ? new Error('JSON object in reply is not closed') : (err as Error);
+    }
+    start = text.indexOf('{', start + 1);
+  }
+  throw firstError!;
+}
+
+/**
+ * Shortens text to at most `max` characters, ending at the last full sentence that fits.
+ * Falls back to the last word break plus an ellipsis when not even one sentence fits.
+ */
+export function clipSentences(text: string, max: number): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  const head = t.slice(0, max);
+  const ends = [...head.matchAll(/[.!?…]["'”’)\]]*(?=\s|$)/g)];
+  const last = ends.at(-1);
+  if (last && last.index! + last[0].length >= max / 3) return head.slice(0, last.index! + last[0].length);
+  const space = head.lastIndexOf(' ', max - 1);
+  return `${head.slice(0, space > max / 2 ? space : max - 1).trimEnd()}…`;
 }
 
 /**
