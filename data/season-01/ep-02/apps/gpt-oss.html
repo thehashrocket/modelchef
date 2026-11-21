@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FreshTrack – Smart Grocery List</title>
+<meta name="description" content="An offline grocery list with inline add/edit, expiry warnings, and phone‑friendly design for home cooks.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  *{box-sizing:border-box;}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:1rem;background:#f7f9fc;color:#333;}
+  h1{margin:0 0 0.5rem;font-size:1.5rem;text-align:center;}
+  #app{max-width:420px;margin:auto;background:#fff;padding:1rem;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+  form{display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;}
+  form input[type=text],form input[type=number],form input[type=date]{flex:1 1 100%;padding:0.4rem;border:1px solid #ccc;border-radius:4px;font-size:0.9rem;}
+  form button{flex:1 1 100%;padding:0.5rem;background:#28a745;color:#fff;border:none;border-radius:4px;font-size:0.9rem;cursor:pointer;}
+  form button:focus{outline:2px solid #1e7e34;}
+  ul{list-style:none;padding:0;margin:0;}
+  li{display:flex;align-items:center;justify-content:space-between;padding:0.5rem;border-bottom:1px solid #eee;}
+  li.expiring{background:#ffe5e5;}
+  .item-info{flex:1;overflow:hidden;}
+  .item-info span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .actions button{margin-left:0.3rem;background:#007bff;color:#fff;border:none;padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;cursor:pointer;}
+  .actions button.delete{background:#dc3545;}
+  .actions button:focus{outline:2px solid #0056b3;}
+  @media (max-width:390px){
+    #app{padding:0.8rem;}
+    h1{font-size:1.3rem;}
+    form button{font-size:0.8rem;}
+    .actions button{font-size:0.7rem;padding:0.2rem 0.4rem;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>FreshTrack</h1>
+  <form id="addForm">
+    <input type="text" id="name" placeholder="Item name" required>
+    <input type="number" id="qty" placeholder="Qty" min="1" required>
+    <input type="date" id="exp" placeholder="Expiry date">
+    <button type="submit">Add Item</button>
+  </form>
+  <ul id="list"></ul>
+</div>
+
+<script>
+(() => {
+  // Storage abstraction
+  let storageAvailable = false;
+  let memoryStore = [];
+  try {
+    const testKey = '__test__';
+    localStorage.setItem(testKey, testKey);
+    localStorage.removeItem(testKey);
+    storageAvailable = true;
+  } catch (e) { storageAvailable = false; }
+
+  const loadData = () => {
+    if (storageAvailable) {
+      const json = localStorage.getItem('freshtrack-data');
+      return json ? JSON.parse(json) : null;
+    }
+    return memoryStore.length ? memoryStore : null;
+  };
+
+  const saveData = (data) => {
+    if (storageAvailable) {
+      localStorage.setItem('freshtrack-data', JSON.stringify(data));
+    } else {
+      memoryStore = data;
+    }
+  };
+
+  // Demo items if empty
+  const demoItems = [
+    {name:'Milk', qty:2, exp:dateOffset(2)},
+    {name:'Eggs', qty:12, exp:dateOffset(5)},
+    {name:'Bread', qty:1, exp:dateOffset(-1)},
+    {name:'Tomatoes', qty:5, exp:''}
+  ];
+
+  function dateOffset(days) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  }
+
+  // State
+  let items = loadData() || demoItems;
+  saveData(items);
+
+  // DOM refs
+  const listEl = document.getElementById('list');
+  const form = document.getElementById('addForm');
+  const nameInput = document.getElementById('name');
+  const qtyInput = document.getElementById('qty');
+  const expInput = document.getElementById('exp');
+
+  // Render
+  const render = () => {
+    listEl.innerHTML = '';
+    items.forEach((it, idx) => {
+      const li = document.createElement('li');
+      const daysDiff = it.exp ? Math.floor((new Date(it.exp) - new Date())/86400000) : null;
+      if (daysDiff !== null && daysDiff <= 7) li.classList.add('expiring');
+
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'item-info';
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = it.name + (it.exp ? ` (exp: ${it.exp})` : '');
+      const qtySpan = document.createElement('span');
+      qtySpan.textContent = `Qty: ${it.qty}`;
+      infoDiv.append(nameSpan, qtySpan);
+
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'actions';
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Edit';
+      editBtn.title = 'Edit item';
+      editBtn.onclick = () => editItem(idx);
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Del';
+      delBtn.className = 'delete';
+      delBtn.title = 'Delete item';
+      delBtn.onclick = () => {
+        items.splice(idx,1);
+        saveData(items);
+        render();
+      };
+      actionsDiv.append(editBtn, delBtn);
+      li.append(infoDiv, actionsDiv);
+      listEl.appendChild(li);
+    });
+  };
+
+  // Add
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const name = nameInput.value.trim();
+    const qty = parseInt(qtyInput.value,10);
+    const exp = expInput.value;
+    if (!name || !qty) return;
+    items.push({name, qty, exp});
+    saveData(items);
+    form.reset();
+    render();
+  });
+
+  // Edit
+  const editItem = (index) => {
+    const it = items[index];
+    const newName = prompt('Edit name:', it.name);
+    if (newName === null) return; // cancelled
+    const newQty = prompt('Edit quantity:', it.qty);
+    if (newQty === null) return;
+    const newExp = prompt('Edit expiry (YYYY-MM-DD) or leave blank:', it.exp);
+    if (newExp === null) return;
+    items[index] = {
+      name: newName.trim() || it.name,
+      qty: parseInt(newQty,10) || it.qty,
+      exp: newExp.trim()
+    };
+    saveData(items);
+    render();
+  };
+
+  // Initial render
+  render();
+})();
+</script>
+</body>
+</html>

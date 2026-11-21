@@ -27,6 +27,34 @@
               "improve": "Wire the meat-probe pull temps and rest timers straight into the live dish cards so the whole pass stays one coherent backward timeline instead of four separate tools."
             }
           ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "Lumen · Soundstage Lighting & Photometric Plotter",
+          "pitch": "A real-time cinematic photometric studio calculating inverse-square falloff, Kelvin color mixing, contrast ratios, and camera exposure for film lighting design.",
+          "rank": 2,
+          "of": 5,
+          "total": 7.613333333333332,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "The surface is slick and the inverse-square / CCT / IRE math genuinely runs, but the beam-angle control is dead weight: every fixture auto-aims at the talent, so the cone-attenuation branch never fires and dragging talent outside the drawn beam leaves lux, IRE and T-stop untouched. The 'Shift+drag to aim' hint is never implemented, and the machine report shows horizontal overflow at phone width against your own 390px claim. A DP would stop trusting the numbers the first time the cone lies to them.",
+              "improve": "Make the cone honest: give each fixture a real aim angle and drive lux/IRE/aperture to zero when the subject falls outside the beam, so the beam-angle slider and the drawn cone actually move the exposure readout."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "This is a dense, purpose-built photometric sandbox that actually runs the inverse-square math, CCT mix, T-stop, and IRE probe in real time while you drag fixtures—rare restraint in a dark pro UI that feels like a gaffer's tool rather than a demo. Desktop plating is tight and legible; the 390px view immediately betrays horizontal overflow and a collapsed right rail that turns the inspector into a cramped afterthought, which undercuts the claim of a tactile mobile sandbox.",
+              "improve": "Fix the phone layout so the stage, telemetry strip, and fixture inspector never force horizontal scroll—stack cleanly and keep the selected fixture controls fully reachable without overflow."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "Lumen is the first dish this season that isn't a kitchen timer wearing a new hat. The photometric math and live beam visualization feel like a real tool for a real craft, not a homework project. But you promised a 390px mobile viewport and the machine report shows horizontal overflow—your presentation wrote a check your code couldn't cash.",
+              "improve": "Fix the mobile layout so nothing overflows at 390px before you claim it is mobile-ready."
+            }
+          ]
         }
       ]
     },
@@ -61,12 +89,35 @@
               "improve": "Next time, take one feature—say the converter—and make it actually cook-specific, like handling ingredient density so a cup of flour converts to grams properly, instead of shipping four shallow tools I’ve seen a hundred times."
             }
           ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "Baker's Ratio & Density Engine",
+          "pitch": "A professional baking tool for baker's percentages, ingredient-specific density conversions, and precision audio timers.",
+          "rank": 3,
+          "of": 5,
+          "total": 7.359999999999999,
+          "outcome": "safe",
+          "feedback": [
+            {
+              "judge": "The Craftsman",
+              "critique": "A focused baker's percentage scaler with live weight math, ingredient density conversion both ways, and a real Web Audio timer with visual pulse—tight, professional, and something a serious home baker would bookmark. Dark cards, gold accents, and phone layout are restrained and clean; localStorage and no console noise show care. The density list is solid but finite, and there's no delete on formula rows or unit flexibility beyond cups/grams.",
+              "improve": "Add per-row delete and a way to mark which ingredient is the 100% flour base so multi-flour formulas don't break the math."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "This is a tidy little baking workbench, and I appreciate that you didn't hand me another pomodoro timer. But a baker's percentage calculator with a density chart is exactly the kind of polished utility I've seen a hundred times—it's competent, but it doesn't surprise me. You built a reliable tool, not a new recipe.",
+              "improve": "Next time, lead with one genuinely unexpected interaction—like a hydration calculator that adjusts for ambient humidity, or a formula that suggests ingredient substitutions based on the density engine—rather than assembling three standard utilities."
+            }
+          ]
         }
       ]
     },
     "gpt-oss": {
-      "status": "active",
-      "eliminatedIn": null,
+      "status": "eliminated",
+      "eliminatedIn": 2,
       "history": [
         {
           "episode": 1,
@@ -93,6 +144,34 @@
               "judge": "The Maverick",
               "critique": "Pantry Pal is a clean, working pantry list, but it’s just a to-do list with food labels—exactly the kind of polished cliche I’m tired of. The demo items save it from an empty screen, yet there’s no editing, no expiry warnings, and no reason to open it twice. Worse, you promised a phone layout that doesn’t overflow, and it does.",
               "improve": "Add an edit button so a cook can fix a typo instead of deleting and retyping an entire item."
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "FreshTrack – Smart Grocery List",
+          "pitch": "An offline grocery list with inline add/edit, expiry warnings, and phone‑friendly design for home cooks.",
+          "rank": 4,
+          "of": 5,
+          "total": 5.733333333333334,
+          "outcome": "eliminated",
+          "feedback": [
+            {
+              "judge": "The Pragmatist",
+              "critique": "The pitch says you replaced the prompt flow with inline add/edit, but Edit still fires three raw prompt() calls, so fixing a quantity or date is worse than adding and clunky on a phone. There is also no way to mark something as bought, so a real cook can only add or delete, which is not a grocery list they reopen. The expiry warning is one <=7-day check painted a single pink shade, not the smart signal claimed, and it never separates already-expired from expiring-soon.",
+              "improve": "Make Edit reuse the same inline form as Add (tap Edit, the row becomes name/qty/date fields with Save and Cancel) so the inline add/edit claim is actually true and mobile users stop getting hit with three prompts."
+            },
+            {
+              "judge": "The Craftsman",
+              "critique": "The expiry highlighting and phone-width layout work, and the card is clean enough, but the chef claimed an inline edit form and then shipped prompt() dialogs—exactly the flow they said they replaced. Focus rings exist, yet the list rows feel cramped, the pink wash is blunt, and empty expiry items sit awkwardly next to the warned ones with no empty-state or sort.",
+              "improve": "Make Edit truly inline: populate the existing form from the row, change the button to Save, and drop the prompts entirely."
+            },
+            {
+              "judge": "The Maverick",
+              "critique": "FreshTrack is a tidy grocery list, but it's the same dish I've tasted a thousand times. You promised inline editing and delivered browser prompts, so the plate doesn't match the menu. It's polished enough, but polish isn't invention.",
+              "improve": "Build the actual inline edit interface you described instead of using prompt(), or give the list a reason to exist beyond a Notes app, like recipe linkage or store aisles."
             }
           ]
         }
@@ -129,6 +208,18 @@
               "improve": "Add loud, distinct audio alerts so a cook with messy hands doesn't have to keep checking the screen to know when to start the next component."
             }
           ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "No dish",
+          "pitch": "Forfeited. Model unavailable: openrouter/baidu/ernie-5.5-flash-preview:free: empty reply (stop reason: length) | openrouter/baidu/ernie-5.5-flash-preview:free: empty reply (stop reason: length) | openrouter/baidu/ernie-5.5-flash-preview:free: empty reply (stop reason: length)",
+          "rank": 5,
+          "of": 5,
+          "total": 0,
+          "outcome": "survived the pressure test",
+          "feedback": []
         }
       ]
     },
@@ -156,6 +247,24 @@
               "judge": "The Craftsman",
               "critique": "The kitchen-timeline idea is a sharp theme fit and the empty planning chrome looks intentional—warm palette, sticky header, stacked phone form—but a console error on load and a broken step-add path leave the plate half-empty: no demo dishes, no Gantt bars, no live now-line. Claims about CSS Grid collapse, localStorage fallback, and zero errors do not match what is actually on the plate.",
               "improve": "Ship a complete, error-free script so Load Demo and Add Step actually populate the timeline before you polish the cooking-mode chrome."
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "type": "invention",
+          "theme": null,
+          "title": "Lens — Perspective Shifter for Stuck Decisions",
+          "pitch": "A decision journal that reveals hidden angles on tough choices through six cognitive lenses, for anyone paralyzed by overthinking.",
+          "rank": 1,
+          "of": 5,
+          "total": 8.559999999999999,
+          "outcome": "won",
+          "feedback": [
+            {
+              "judge": "The Craftsman",
+              "critique": "The list breathes, the phone layout doesn't fight you, hover actions yield cleanly to always-visible controls at narrow width, and the seeded decisions mean I never land on empty chrome—restraint that actually impresses. Light/dark, focus rings, empty state, toasts, and escape-to-close are all present and correct. The clarity number is theater (sentiment weighting on free text), but the six-lens journal itself is honest and complete.",
+              "improve": "Replace the fake sentiment-weighted clarity score with something that surfaces real tension or agreement across the six written perspectives, or drop the score entirely and let the lenses speak."
             }
           ]
         }
@@ -204,9 +313,21 @@
       "theme": "Something for a kitchen",
       "winner": "gemini-flash",
       "eliminated": "cohere-north"
+    },
+    {
+      "number": 2,
+      "date": "2026-11-21",
+      "type": "invention",
+      "theme": null,
+      "ingredient": null,
+      "winner": "nemotron",
+      "eliminated": "gpt-oss"
     }
   ],
-  "immune": "gemini-flash",
-  "nextTheme": null,
+  "immune": "nemotron",
+  "nextTheme": {
+    "theme": "Between the lines",
+    "chosenBy": "nemotron"
+  },
   "champion": null
 }

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baker's Ratio & Density Engine</title>
+    <meta name="description" content="A professional baking tool for baker's percentages, ingredient-specific density conversions, and precision audio timers.">
+    <style>
+        :root {
+            --bg: #1a1a1a;
+            --card: #2d2d2d;
+            --accent: #d4af37;
+            --text: #e0e0e0;
+            --text-dim: #a0a0a0;
+            --danger: #cf6679;
+            --success: #03dac6;
+            --border: #404040;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 { 
+            margin: 0; 
+            font-size: 1.5rem; 
+            color: var(--accent); 
+            text-transform: uppercase; 
+            letter-spacing: 2px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--accent);
+        }
+
+        /* Ratio Table Styles */
+        .ratio-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .grid-header {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            padding-bottom: 5px;
+        }
+
+        input, select {
+            background: #1e1e1e;
+            border: 1px solid var(--border);
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 1rem;
+            width: 100%;
+        }
+
+        input:focus {
+            outline: 2px solid var(--accent);
+            border-color: transparent;
+        }
+
+        .btn {
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 15px;
+            font-weight: 600;
+            transition: opacity 0.2s;
+            text-align: center;
+        }
+
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn:active { opacity: 0.7; }
+
+        /* Density Converter Styles */
+        .conv-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .conv-input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Timer Styles */
+        .timer-display {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 3rem;
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+            color: var(--text);
+        }
+
+        .timer-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .timer-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .timer-inputs input {
+            width: 60px;
+            text-align: center;
+        }
+
+        .timer-active {
+            animation: pulse 1.5s infinite;
+            color: var(--success) !important;
+        }
+
+        .timer-alert {
+            animation: alarm 0.5s infinite;
+            color: var(--danger) !important;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes alarm {
+            0% { background: var(--card); }
+            50% { background: #5c2b2b; }
+            100% { background: var(--card); }
+        }
+
+        .unit-label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-left: 5px;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Baker's Ratio</h1>
+    </header>
+
+    <div class="container">
+        <!-- Baker's Percentage Tool -->
+        <div class="card">
+            <div class="card-title">⚖️ Formula Scaler</div>
+            <div class="ratio-grid grid-header">
+                <div>Ingredient</div>
+                <div>Ratio %</div>
+                <div>Weight</div>
+            </div>
+            <div id="ratio-list">
+                <!-- Populated by JS -->
+            </div>
+            <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
+                <label style="font-size: 0.9rem;">Flour Base:</label>
+                <input type="number" id="flour-base" value="500" style="width: 100px;" oninput="updateRatios()">
+                <span class="unit-label">g</span>
+            </div>
+            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                <button class="btn btn-ghost" style="flex: 1" onclick="addRow()">+ Add Item</button>
+            </div>
+        </div>
+
+        <!-- Density Converter -->
+        <div class="card">
+            <div class="card-title">🧪 Density Engine</div>
+            <div class="conv-row">
+                <div>
+                    <label style="font-size: 0.8rem; color: var(--text-dim);">Ingredient</label>
+                    <select id="density-ingredient" onchange="convertVolumeToWeight()">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <div class="conv-input-group">
+                    <div>
+                        <label style="font-size: 0.8rem; color: var(--text-dim);">Volume (Cups)</label>
+                        <input type="number" id="conv-vol" value="1" step="0.25" oninput="convertVolumeToWeight()">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.8rem; color: var(--text-dim);">Weight (Grams)</label>
+                        <input type="number" id="conv-weight" oninput="convertWeightToVolume()">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Precision Timer -->
+        <div class="card" id="timer-card">
+            <div class="card-title">⏱️ Precision Timer</div>
+            <div class="timer-inputs">
+                <div>
+                    <input type="number" id="timer-min" value="0" min="0" max="999">
+                    <div class="unit-label" style="text-align: center;">min</div>
+                </div>
+                <div>
+                    <input type="number" id="timer-sec" value="10" min="0" max="59">
+                    <div class="unit-label" style="text-align: center;">sec</div>
+                </div>
+            </div>
+            <div class="timer-display" id="timer-display">00:10</div>
+            <div class="timer-controls">
+                <button id="timer-start-btn" class="btn btn-primary" onclick="toggleTimer()">Start</button>
+                <button class="btn btn-ghost" onclick="resetTimer()">Reset</button>
+            </div>
+        </div>
+
+        <div class="footer-note">Precision tools for the modern pâtissier.</div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        const DENSITY_MAP = {
+            "All-Purpose Flour": 125,
+            "Bread Flour": 130,
+            "Cake Flour": 110,
+            "Granulated Sugar": 200,
+            "Brown Sugar (Packed)": 213,
+            "Powdered Sugar": 120,
+            "Unsalted Butter": 227,
+            "Whole Milk": 245,
+            "Water": 236,
+            "Honey/Syrup": 340,
+            "Cocoa Powder": 100,
+            "Yeast (Dry)": 140
+        };
+
+        let formula = [
+            { name: "Bread Flour", ratio: 100 },
+            { name: "Water", ratio: 70 },
+            { name: "Salt", ratio: 2 },
+            { name: "Instant Yeast", ratio: 1 }
+        ];
+
+        // --- STATE ---
+        let timerInterval = null;
+        let timeLeft = 10;
+        let isRunning = false;
+        let audioCtx = null;
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            initDensitySelect();
+            renderFormula();
+            
+            // Load from storage if available
+            try {
+                const saved = localStorage.getItem('bakersRatioFormula');
+                if (saved) {
+                    formula = JSON.parse(saved);
+                    renderFormula();
+                }
+            } catch(e) { console.log("Storage unavailable"); }
+        };
+
+        function initDensitySelect() {
+            const select = document.getElementById('density-ingredient');
+            Object.keys(DENSITY_MAP).sort().forEach(ing => {
+                const opt = document.createElement('option');
+                opt.value = ing;
+                opt.textContent = ing;
+                select.appendChild(opt);
+            });
+            convertVolumeToWeight();
+        }
+
+        // --- FORMULA LOGIC ---
+        function renderFormula() {
+            const container = document.getElementById('ratio-list');
+            container.innerHTML = '';
+            
+            const flourBase = parseFloat(document.getElementById('flour-base').value) || 0;
+
+            formula.forEach((item, index) => {
+                const weight = ((item.ratio / 100) * flourBase).toFixed(1);
+                const row = document.createElement('div');
+                row.className = 'ratio-grid';
+                row.innerHTML = `
+                    <input type="text" value="${item.name}" onchange="updateItem(${index}, 'name', this.value)">
+                    <input type="number" value="${item.ratio}" oninput="updateItem(${index}, 'ratio', this.value)">
+                    <div style="text-align: right; font-weight: bold;">${weight}g</div>
+                `;
+                container.appendChild(row);
+            });
+            saveFormula();
+        }
+
+        function updateItem(index, key, value) {
+            if (key === 'ratio') {
+                formula[index][key] = parseFloat(value) || 0;
+            } else {
+                formula[index][key] = value;
+            }
+            renderFormula();
+        }
+
+        function updateRatios() {
+            renderFormula();
+        }
+
+        function addRow() {
+            formula.push({ name: "New Ingredient", ratio: 0 });
+            renderFormula();
+        }
+
+        function saveFormula() {
+            try {
+                localStorage.setItem('bakersRatioFormula', JSON.stringify(formula));
+            } catch(e) {}
+        }
+
+        // --- CONVERTER LOGIC ---
+        function convertVolumeToWeight() {
+            const ing = document.getElementById('density-ingredient').value;
+            const vol = parseFloat(document.getElementById('conv-vol').value) || 0;
+            const density = DENSITY_MAP[ing];
+            document.getElementById('conv-weight').value = (vol * density).toFixed(1);
+        }
+
+        function convertWeightToVolume() {
+            const ing = document.getElementById('density-ingredient').value;
+            const weight = parseFloat(document.getElementById('conv-weight').value) || 0;
+            const density = DENSITY_MAP[ing];
+            document.getElementById('conv-vol').value = (weight / density).toFixed(2);
+        }
+
+        // --- TIMER LOGIC ---
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playBeep(freq, duration) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function triggerAlarm() {
+            const card = document.getElementById('timer-card');
+            const display = document.getElementById('timer-display');
+            card.classList.add('timer-alert');
+            display.classList.add('timer-alert');
+            
+            // Beep sequence
+            let count = 0;
+            const alarmInt = setInterval(() => {
+                playBeep(880, 0.2);
+                count++;
+                if (count > 5) clearInterval(alarmInt);
+            }, 400);
+        }
+
+        function toggleTimer() {
+            initAudio();
+            const btn = document.getElementById('timer-start-btn');
+            
+            if (isRunning) {
+                clearInterval(timerInterval);
+                btn.textContent = 'Start';
+                btn.classList.replace('btn-danger', 'btn-primary');
+                document.getElementById('timer-display').classList.remove('timer-active');
+                isRunning = false;
+            } else {
+                // Set time from inputs if not currently counting down from a paused state
+                if (timeLeft <= 0 || !isRunning) {
+                    const m = parseInt(document.getElementById('timer-min').value) || 0;
+                    const s = parseInt(document.getElementById('timer-sec').value) || 0;
+                    timeLeft = (m * 60) + s;
+                }
+
+                if (timeLeft <= 0) return;
+
+                isRunning = true;
+                btn.textContent = 'Stop';
+                btn.classList.replace('btn-primary', 'btn-danger');
+                document.getElementById('timer-display').classList.add('timer-active');
+
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    updateTimerDisplay();
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        isRunning = false;
+                        btn.textContent = 'Start';
+                        btn.classList.replace('btn-danger', 'btn-primary');
+                        document.getElementById('timer-display').classList.remove('timer-active');
+                        triggerAlarm();
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            const m = parseInt(document.getElementById('timer-min').value) || 0;
+            const s = parseInt(document.getElementById('timer-sec').value) || 0;
+            timeLeft = (m * 60) + s;
+            
+            document.getElementById('timer-start-btn').textContent = 'Start';
+            document.getElementById('timer-start-btn').classList.replace('btn-danger', 'btn-primary');
+            document.getElementById('timer-display').classList.remove('timer-active', 'timer-alert');
+            document.getElementById('timer-card').classList.remove('timer-alert');
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(timeLeft / 60);
+            const s = timeLeft % 60;
+            document.getElementById('timer-display').textContent = 
+                `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>

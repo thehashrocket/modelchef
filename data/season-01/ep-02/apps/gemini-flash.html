@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lumen · Soundstage Lighting & Photometric Plotter</title>
+  <meta name="description" content="A real-time cinematic photometric studio calculating inverse-square falloff, Kelvin color mixing, contrast ratios, and camera exposure for film lighting design.">
+  <style>
+    :root {
+      --bg-root: #0a0c10;
+      --bg-panel: #11141a;
+      --bg-card: #181c24;
+      --bg-card-hover: #222733;
+      --border-subtle: #262c3a;
+      --border-focus: #3b82f6;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent-amber: #f59e0b;
+      --accent-blue: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-root);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.4;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* TOP HEADER PASS */
+    header.top-bar {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 10px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 20;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-mark {
+      width: 26px;
+      height: 26px;
+      border-radius: var(--radius-sm);
+      background: radial-gradient(circle at 35% 35%, #fde047, #f59e0b 60%, #b45309);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--accent-emerald);
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 6px var(--accent-emerald);
+      animation: pulseAnim 1.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulseAnim {
+      from { opacity: 0.4; transform: scale(0.85); }
+      to { opacity: 1; transform: scale(1.2); }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .preset-selector {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 9px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      outline: none;
+    }
+    .preset-selector:focus {
+      border-color: var(--border-focus);
+    }
+
+    .action-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+    .action-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: #3b4252;
+    }
+    .action-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    /* MAIN APP WORKSPACE */
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    @media (max-width: 900px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+      }
+    }
+
+    /* LEFT VIEWPORT: SOUNDSTAGE & METERS */
+    .viewport-column {
+      display: flex;
+      flex-direction: column;
+      background: #06080b;
+      border-right: 1px solid var(--border-subtle);
+      position: relative;
+    }
+
+    .stage-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: rgba(17, 20, 26, 0.9);
+      border-bottom: 1px solid var(--border-subtle);
+      gap: 8px;
+    }
+
+    .stage-mode-group {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      padding: 2px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .mode-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .mode-tab.active {
+      background: #283141;
+      color: #fff;
+    }
+
+    .stage-hints {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .canvas-container {
+      position: relative;
+      flex: 1;
+      min-height: 380px;
+      height: 480px;
+      width: 100%;
+      background: #080a0e;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+
+    @media (max-width: 600px) {
+      .canvas-container {
+        height: 380px;
+        min-height: 340px;
+      }
+    }
+
+    canvas#stageCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+
+    /* FLOATING OVERLAY GAUGES ON STAGE */
+    .stage-floating-hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .hud-chip {
+      background: rgba(10, 14, 20, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(6px);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+    }
+    .hud-chip .val {
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* CAMERA & PHOTOMETRIC TELEMETRY BAR */
+    .telemetry-strip {
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border-subtle);
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .telemetry-cell {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .telemetry-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    .telemetry-val {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: #fff;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    .telemetry-val span.sub {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+
+    .ratio-pill {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-top: 2px;
+      width: fit-content;
+    }
+    .ratio-noir { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+    .ratio-drama { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+    .ratio-soft { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+
+    /* FALSE COLOR IRE BAR */
+    .ire-strip-wrapper {
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border-subtle);
+      padding: 8px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ire-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    .ire-bar {
+      height: 10px;
+      border-radius: 4px;
+      position: relative;
+      background: linear-gradient(to right, 
+        #4c1d95 0%, 
+        #2563eb 15%, 
+        #1e293b 25%, 
+        #10b981 40%, 
+        #ec4899 55%, 
+        #e2e8f0 70%, 
+        #f59e0b 85%, 
+        #ef4444 100%
+      );
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .ire-marker {
+      position: absolute;
+      top: -3px;
+      width: 4px;
+      height: 16px;
+      background: #ffffff;
+      border-radius: 2px;
+      transform: translateX(-50%);
+      box-shadow: 0 0 6px #fff;
+      transition: left 0.1s ease-out;
+    }
+
+    /* RIGHT COLUMN: FIXTURE RACK & CONTROLS */
+    .controls-column {
+      background: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .fixtures-list {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .fixture-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+    .fixture-card:hover {
+      border-color: #3e4758;
+    }
+    .fixture-card.selected {
+      border-color: var(--border-focus);
+      background: #17202e;
+      box-shadow: inset 0 0 0 1px var(--border-focus);
+    }
+
+    .fixture-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .fixture-label-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .fixture-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.3);
+      flex-shrink: 0;
+    }
+
+    .fixture-name {
+      font-weight: 700;
+      font-size: 12px;
+      color: #fff;
+    }
+
+    .fixture-role {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-muted);
+    }
+
+    .fixture-toggles {
+      display: flex;
+      gap: 4px;
+    }
+
+    .mini-btn {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-dim);
+      font-size: 9px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding: 2px 5px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .mini-btn.active-solo {
+      background: #f59e0b;
+      color: #000;
+      border-color: #f59e0b;
+    }
+    .mini-btn.active-mute {
+      background: #ef4444;
+      color: #fff;
+      border-color: #ef4444;
+    }
+
+    .fixture-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+    .fixture-meta span strong {
+      color: var(--text-main);
+    }
+
+    /* DETAILED SELECTED FIXTURE CONTROLS */
+    .inspector-box {
+      border-top: 1px solid var(--border-subtle);
+      padding: 12px 14px;
+      background: rgba(13, 16, 22, 0.7);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ctrl-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ctrl-label-bar {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+    .ctrl-label-bar span.val {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 5px;
+      background: #252c3a;
+      border-radius: 4px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 5px rgba(56, 189, 248, 0.5);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      border: none;
+    }
+
+    .cct-slider::-webkit-slider-thumb {
+      background: #fde047 !important;
+      box-shadow: 0 0 6px rgba(253, 224, 71, 0.6) !important;
+    }
+
+    .select-input {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: #fff;
+      font-size: 11px;
+      padding: 5px 8px;
+      border-radius: var(--radius-sm);
+      outline: none;
+      width: 100%;
+    }
+
+    /* ELECTRICAL & SAFETY LOAD FOOTER */
+    .power-summary-box {
+      margin-top: auto;
+      border-top: 1px solid var(--border-subtle);
+      padding: 10px 14px;
+      background: #0b0e14;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .power-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--accent-emerald);
+      font-weight: 700;
+    }
+    .power-pill.warn {
+      color: var(--accent-amber);
+    }
+
+    /* PRINT/SUMMARY MODAL */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      max-width: 580px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 18px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+    .modal-table th, .modal-table td {
+      border: 1px solid var(--border-subtle);
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .modal-table th {
+      background: var(--bg-card);
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="top-bar">
+    <div class="brand-group">
+      <div class="brand-mark">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">LUMEN</div>
+      </div>
+      <div class="live-badge" title="Photometric engine running continuously">
+        <span class="pulse-dot"></span>
+        <span>LIVE PHOTOMETRICS</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <select id="presetSelect" class="preset-selector" aria-label="Lighting Scheme Presets">
+        <option value="noir">Preset: Neo-Noir Dramatic (8:1)</option>
+        <option value="golden">Preset: Golden Hour Narrative (3:1)</option>
+        <option value="beauty">Preset: Commercial High-Key (1.5:1)</option>
+        <option value="cyber">Preset: Cyberpunk Dual-Tone</option>
+      </select>
+
+      <button id="hazeToggleBtn" class="action-btn active" title="Toggle Volumetric Atmospheric Smoke">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+          <path d="M8 19h8"></path>
+          <path d="M6 22h12"></path>
+        </svg>
+        <span>Haze: ON</span>
+      </button>
+
+      <button id="addLightBtn" class="action-btn" title="Add a new lighting fixture">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Add Fixture</span>
+      </button>
+
+      <button id="specSheetBtn" class="action-btn" title="View Gaffer Plot Sheet">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        <span>Plot Sheet</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <main class="workspace">
+    <!-- LEFT: SOUNDSTAGE & PHOTOMETRICS -->
+    <div class="viewport-column">
+      <div class="stage-toolbar">
+        <div class="stage-mode-group">
+          <button id="modeBeams" class="mode-tab active">Photometric Beams</button>
+          <button id="modeIsolines" class="mode-tab">Lux Footprint</button>
+          <button id="modeFalseColor" class="mode-tab">False Color Cam</button>
+        </div>
+        <div class="stage-hints">
+          Drag fixtures or talent probe &bull; Shift+drag to aim
+        </div>
+      </div>
+
+      <!-- CANVAS VIEWPORT -->
+      <div class="canvas-container" id="canvasContainer">
+        <canvas id="stageCanvas"></canvas>
+
+        <div class="stage-floating-hud">
+          <div class="hud-chip">
+            <span style="color:var(--text-dim)">GRID SCALE</span>
+            <span class="val">1 grid = 1.0 m</span>
+          </div>
+          <div class="hud-chip">
+            <span style="color:var(--text-dim)">TALENT POS</span>
+            <span id="hudTalentPos" class="val">X: 0.0m, Y: 0.0m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PHOTOMETRIC & EXPOSURE TELEMETRY STRIP -->
+      <div class="telemetry-strip">
+        <div class="telemetry-cell">
+          <div class="telemetry-label">Incident Illuminance</div>
+          <div class="telemetry-val" id="telemetryLux">
+            0 <span class="sub">LUX</span>
+          </div>
+          <div style="font-size:10px; color:var(--text-dim); font-family:var(--font-mono)" id="telemetryFc">
+            0 fc
+          </div>
+        </div>
+
+        <div class="telemetry-cell">
+          <div class="telemetry-label">Contrast Key:Fill</div>
+          <div class="telemetry-val" id="telemetryRatio">
+            0:1 <span class="sub">RATIO</span>
+          </div>
+          <div id="ratioPill" class="ratio-pill ratio-noir">High Contrast</div>
+        </div>
+
+        <div class="telemetry-cell">
+          <div class="telemetry-label">Target Cine Aperture</div>
+          <div class="telemetry-val" id="telemetryAperture">
+            T/2.8 <span class="sub">@ ISO 800</span>
+          </div>
+          <div style="font-size:10px; color:var(--text-dim); font-family:var(--font-mono)">
+            1/48s (180&deg;)
+          </div>
+        </div>
+
+        <div class="telemetry-cell">
+          <div class="telemetry-label">Resultant CCT Mix</div>
+          <div class="telemetry-val" id="telemetryKelvin">
+            4200 <span class="sub">KELVIN</span>
+          </div>
+          <div id="kelvinSwatchBar" style="height:3px; border-radius:2px; background:#fde047; margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <!-- FALSE COLOR IRE METER -->
+      <div class="ire-strip-wrapper">
+        <div class="ire-header">
+          <span>FALSE COLOR IRE EXPOSURE (TALENT FOREHEAD PROBE)</span>
+          <span id="ireValueLabel">56 IRE · Optimum Key Skin</span>
+        </div>
+        <div class="ire-bar">
+          <div class="ire-marker" id="ireMarker" style="left: 56%;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:8px; font-family:var(--font-mono); color:var(--text-dim); margin-top:2px;">
+          <span>0 (Crush)</span>
+          <span>18 (Shadow)</span>
+          <span>40 (18% Grey)</span>
+          <span>55 (Key Skin)</span>
+          <span>70 (Highlight)</span>
+          <span>100 (Clip)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: FIXTURE CONTROLS & INSPECTOR -->
+    <div class="controls-column">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+          </svg>
+          Stage Fixtures (<span id="fixtureCount">3</span>)
+        </div>
+        <span style="font-size:10px; color:var(--text-dim); font-family:var(--font-mono)">SOLO / MUTE</span>
+      </div>
+
+      <!-- FIXTURES LIST -->
+      <div class="fixtures-list" id="fixturesList">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- SELECTED FIXTURE INSPECTOR -->
+      <div class="inspector-box" id="inspectorBox">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:11px; font-weight:700; color:var(--accent-blue); text-transform:uppercase; letter-spacing:0.04em;">
+            Fixture Inspector: <span id="inspectorName" style="color:#fff;">Key Light</span>
+          </div>
+          <button id="deleteFixtureBtn" class="mini-btn" style="color:var(--accent-rose); border-color:rgba(244,63,94,0.3)" title="Delete this fixture">Delete</button>
+        </div>
+
+        <!-- Dimmer Slider -->
+        <div class="ctrl-row">
+          <div class="ctrl-label-bar">
+            <span>Dimmer Intensity</span>
+            <span class="val" id="inspDimmerVal">100%</span>
+          </div>
+          <input type="range" id="inspDimmer" min="0" max="100" value="100">
+        </div>
+
+        <!-- CCT Kelvin Slider -->
+        <div class="ctrl-row">
+          <div class="ctrl-label-bar">
+            <span>Color Temperature (CCT)</span>
+            <span class="val" id="inspCctVal">5600K</span>
+          </div>
+          <input type="range" id="inspCct" class="cct-slider" min="2400" max="9000" step="100" value="5600">
+        </div>
+
+        <!-- Beam Angle Slider -->
+        <div class="ctrl-row">
+          <div class="ctrl-label-bar">
+            <span>Beam Spread (Cone Angle)</span>
+            <span class="val" id="inspAngleVal">45&deg;</span>
+          </div>
+          <input type="range" id="inspAngle" min="15" max="110" value="45">
+        </div>
+
+        <!-- Height / Elevation Slider -->
+        <div class="ctrl-row">
+          <div class="ctrl-label-bar">
+            <span>Rig Stand Height</span>
+            <span class="val" id="inspHeightVal">2.4m</span>
+          </div>
+          <input type="range" id="inspHeight" min="1.0" max="5.0" step="0.1" value="2.4">
+        </div>
+
+        <!-- Diffusion Modifier -->
+        <div class="ctrl-row">
+          <div class="ctrl-label-bar">
+            <span>Diffusion &amp; Modifier</span>
+            <span class="val" id="inspModVal">-0.0 EV</span>
+          </div>
+          <select id="inspModifier" class="select-input">
+            <option value="none">Open Face / Reflector (0.0 EV Loss)</option>
+            <option value="grid">Honey Eggcrate 40° (-0.7 EV)</option>
+            <option value="silk">1/2 White Diffusion Silk (-1.1 EV)</option>
+            <option value="softbox">Chimeric Dome Softbox (-1.5 EV)</option>
+            <option value="heavy">Full Magic Cloth Diffusion (-2.2 EV)</option>
+          </select>
+        </div>
+
+        <!-- Creative Gel -->
+        <div class="ctrl-row">
+          <div class="ctrl-label-bar">
+            <span>Color Gel</span>
+          </div>
+          <select id="inspGel" class="select-input">
+            <option value="none">No Gel (Raw Lamp CCT)</option>
+            <option value="cto">Full CTO (Warm Tungsten Shift)</option>
+            <option value="ctb">Full CTB (Daylight Cool Blue)</option>
+            <option value="cyan">Tokyo Cyan / Teal</option>
+            <option value="magenta">Neon Magenta / Neon Pink</option>
+            <option value="amber">Sodium Vapor / Bastard Amber</option>
+            <option value="green">Plus Green (Fluor HMI correction)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- POWER & BREAKER SAFETY -->
+      <div class="power-summary-box">
+        <div>
+          <span style="color:var(--text-dim)">STAGE DRAW:</span>
+          <strong id="powerWatts" style="color:#fff">1,500 W</strong>
+          <span style="color:var(--text-dim); margin-left:4px" id="powerAmps">(12.5A @ 120V)</span>
+        </div>
+        <div id="powerPill" class="power-pill">
+          <span>&bull;</span> SAFE ON 20A BREAKER
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL SPEC SHEET / PLOT REPORT -->
+  <div class="modal-backdrop" id="specModal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="font-size:16px; font-weight:700;">Gaffer Lighting Spec &amp; Photometric Log</h2>
+          <p style="font-size:11px; color:var(--text-dim)">Soundstage Rig Schedule &bull; Incident Photometrics</p>
+        </div>
+        <button id="closeModalBtn" class="action-btn">Close [ESC]</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; padding:10px; background:var(--bg-card); border-radius:var(--radius-sm);">
+        <div>
+          <span style="font-size:9px; color:var(--text-dim); text-transform:uppercase;">Key:Fill Contrast</span>
+          <div id="modalRatio" style="font-size:14px; font-weight:700; font-family:var(--font-mono); color:#fff">4.2 : 1</div>
+        </div>
+        <div>
+          <span style="font-size:9px; color:var(--text-dim); text-transform:uppercase;">Calculated Aperture</span>
+          <div id="modalAperture" style="font-size:14px; font-weight:700; font-family:var(--font-mono); color:var(--accent-blue)">T/2.8.4</div>
+        </div>
+        <div>
+          <span style="font-size:9px; color:var(--text-dim); text-transform:uppercase;">Total Connected Load</span>
+          <div id="modalPower" style="font-size:14px; font-weight:700; font-family:var(--font-mono); color:var(--accent-emerald)">1,500W (12.5A)</div>
+        </div>
+      </div>
+
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>Fixture</th>
+            <th>Role</th>
+            <th>CCT / Gel</th>
+            <th>Distance</th>
+            <th>Incident Lux</th>
+            <th>Modifier</th>
+          </tr>
+        </thead>
+        <tbody id="modalTableBody">
+          <!-- populated dynamically -->
+        </tbody>
+      </table>
+
+      <div style="font-size:10px; color:var(--text-dim); font-style:italic;">
+        Calculated using inverse-square radiation falloff law E = (I &times; cos &theta;) / d&sup2; with penumbra cosine beam attenuation and modifier transmittance curves.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      // --- SAFE STORAGE FALLBACK ---
+      const memoryStorage = {};
+      function safeSet(key, val) {
+        try { localStorage.setItem(key, val); } catch (e) { memoryStorage[key] = val; }
+      }
+      function safeGet(key) {
+        try { return localStorage.getItem(key); } catch (e) { return memoryStorage[key] || null; }
+      }
+
+      // --- APP STATE ---
+      const state = {
+        hazeEnabled: true,
+        viewMode: 'beams', // 'beams', 'isolines', 'falsecolor'
+        selectedFixtureId: 'f1',
+        camera: {
+          iso: 800,
+          shutterAngle: 180, // degrees -> 1/48s at 24fps
+          fps: 24
+        },
+        subject: {
+          x: 0, // meters from center
+          y: 0,
+          facingAngle: -Math.PI / 2, // facing north
+          height: 1.7 // eye/forehead probe at 1.7m
+        },
+        fixtures: [],
+        particles: []
+      };
+
+      // Modifier definitions: EV loss and label
+      const MODIFIERS = {
+        none: { name: 'Open Face / 55° Reflector', evLoss: 0.0, factor: 1.0 },
+        grid: { name: 'Honey Eggcrate 40°', evLoss: -0.7, factor: 0.615 },
+        silk: { name: '1/2 Diffusion Silk', evLoss: -1.1, factor: 0.466 },
+        softbox: { name: 'Chimeric Softbox', evLoss: -1.5, factor: 0.353 },
+        heavy: { name: 'Full Magic Cloth', evLoss: -2.2, factor: 0.217 }
+      };
+
+      const GELS = {
+        none: { name: 'No Gel', rgb: null },
+        cto: { name: 'Full CTO', rgb: [255, 140, 50] },
+        ctb: { name: 'Full CTB', rgb: [100, 180, 255] },
+        cyan: { name: 'Tokyo Cyan', rgb: [0, 235, 230] },
+        magenta: { name: 'Neon Magenta', rgb: [244, 40, 160] },
+        amber: { name: 'Sodium Amber', rgb: [255, 165, 0] },
+        green: { name: 'Plus Green', rgb: [60, 230, 90] }
+      };
+
+      // PRESETS
+      const PRESETS = {
+        noir: {
+          name: 'Neo-Noir Dramatic',
+          fixtures: [
+            {
+              id: 'f1',
+              name: 'Key · Hard Spotlight',
+              role: 'Key Light',
+              x: -2.2,
+              y: -1.2,
+              height: 2.2,
+              beamAngle: 36,
+              dimmer: 100,
+              cct: 4200,
+              baseLux1m: 32000,
+              modifier: 'none',
+              gel: 'none',
+              watts: 600,
+              solo: false,
+              mute: false
+            },
+            {
+              id: 'f2',
+              name: 'Fill · Deep Shadow Pad',
+              role: 'Fill Light',
+              x: 2.6,
+              y: -0.6,
+              height: 1.8,
+              beamAngle: 75,
+              dimmer: 14,
+              cct: 3200,
+              baseLux1m: 16000,
+              modifier: 'silk',
+              gel: 'none',
+              watts: 300,
+              solo: false,
+              mute: false
+            },
+            {
+              id: 'f3',
+              name: 'Rim · Cyan Kicker',
+              role: 'Rim / Hair',
+              x: 1.5,
+              y: 2.5,
+              height: 2.6,
+              beamAngle: 40,
+              dimmer: 85,
+              cct: 6500,
+              baseLux1m: 22000,
+              modifier: 'grid',
+              gel: 'cyan',
+              watts: 300,
+              solo: false,
+              mute: false
+            }
+          ]
+        },
+        golden: {
+          name: 'Golden Hour Narrative',
+          fixtures: [
+            {
+              id: 'f1',
+              name: 'Key · Low Sun Tungsten',
+              role: 'Key Light',
+              x: -3.0,
+              y: -1.5,
+              height: 1.6,
+              beamAngle: 50,
+              dimmer: 95,
+              cct: 2800,
+              baseLux1m: 35000,
+              modifier: 'none',
+              gel: 'amber',
+              watts: 800,
+              solo: false,
+              mute: false
+            },
+            {
+              id: 'f2',
+              name: 'Fill · Sky Skylight Bounce',
+              role: 'Fill Light',
+              x: 2.2,
+              y: -1.8,
+              height: 2.5,
+              beamAngle: 80,
+              dimmer: 45,
+              cct: 6500,
+              baseLux1m: 20000,
+              modifier: 'softbox',
+              gel: 'ctb',
+              watts: 300,
+              solo: false,
+              mute: false
+            },
+            {
+              id: 'f3',
+              name: 'Back · Warm Hair Halo',
+              role: 'Rim / Hair',
+              x: 0.2,
+              y: 2.8,
+              height: 2.8,
+              beamAngle: 45,
+              dimmer: 60,
+              cct: 3000,
+              baseLux1m: 18000,
+              modifier: 'none',
+              gel: 'cto',
+              watts: 300,
+              solo: false,
+              mute: false
+            }
+          ]
+        },
+        beauty: {
+          name: 'Commercial High-Key',
+          fixtures: [
+            {
+              id: 'f1',
+              name: 'Key · Huge Dome Softbox',
+              role: 'Key Light',
+              x: -1.5,
+              y: -2.2,
+              height: 2.4,
+              beamAngle: 85,
+              dimmer: 85,
+              cct: 5600,
+              baseLux1m: 40000,
+              modifier: 'softbox',
+              gel: 'none',
+              watts: 600,
+              solo: false,
+              mute: false
+            },
+            {
+              id: 'f2',
+              name: 'Fill · Book Bounce White',
+              role: 'Fill Light',
+              x: 1.6,
+              y: -2.0,
+              height: 2.3,
+              beamAngle: 90,
+              dimmer: 65,
+              cct: 5600,
+              baseLux1m: 30000,
+              modifier: 'heavy',
+              gel: 'none',
+              watts: 400,
+              solo: false,
+              mute: false
+            },
+            {
+              id: 'f3',
+              name: 'Kicker · Subtle Separation',
+              role: 'Rim / Hair',
+              x: 2.0,
+              y: 2.0,
+              height: 2.5,
+              beamAngle: 50,
+              dimmer: 40,
+              cct: 5600,
+              baseLux1m: 15000,
+              modifier: 'grid',
+              gel: 'none',
+              watts: 200,
+              solo: false,
+              mute: false
+            }
+          ]
+        },
+        cyber: {
+          name: 'Cyberpunk Dual-Tone',
+          fixtures: [
+            {
+              id: 'f1',
+              name: 'Key · Neon Magenta',
+              role: 'Key Light',
+              x: -2.4,
+              y: -1.0,
+              height: 1.8,
+              beamAngle: 50,
+              dimmer: 95,
+              cct: 6000,
+              baseLux1m: 30000,
+              modifier: 'grid',
+              gel: 'magenta',
+              watts: 500,
+              solo: false,
+              mute: false
+            },
+            {
+              id: 'f2',
+              name: 'Fill · Electric Cyan',
+              role: 'Fill Light',
+              x: 2.4,
+              y: -1.0,
+              height: 1.8,
+              beamAngle: 50,
+              dimmer: 80,
+              cct: 6500,
+              baseLux1m: 30000,
+              modifier: 'grid',
+              gel: 'cyan',
+              watts: 500,
+              solo: false,
+              mute: false
+            },
+            {
+              id: 'f3',
+              name: 'Top · Sodium Wash',
+              role: 'Rim / Hair',
+              x: 0.0,
+              y: 2.2,
+              height: 3.2,
+              beamAngle: 65,
+              dimmer: 70,
+              cct: 3200,
+              baseLux1m: 20000,
+              modifier: 'silk',
+              gel: 'amber',
+              watts: 300,
+              solo: false,
+              mute: false
+            }
+          ]
+        }
+      };
+
+      // Load initial preset
+      state.fixtures = JSON.parse(JSON.stringify(PRESETS.noir.fixtures));
+
+      // --- HAZE PARTICLES ---
+      function initParticles() {
+        state.particles = [];
+        for (let i = 0; i < 65; i++) {
+          state.particles.push({
+            x: (Math.random() - 0.5) * 10,
+            y: (Math.random() - 0.5) * 10,
+            vx: (Math.random() - 0.5) * 0.006,
+            vy: (Math.random() - 0.5) * 0.006 - 0.002,
+            size: Math.random() * 2.2 + 0.8,
+            alpha: Math.random() * 0.4 + 0.1
+          });
+        }
+      }
+      initParticles();
+
+      // --- COLOR HELPERS (CCT KELVIN TO RGB) ---
+      function kelvinToRgb(kelvin) {
+        const temp = kelvin / 100;
+        let red, green, blue;
+
+        if (temp <= 66) {
+          red = 255;
+          green = Math.max(0, Math.min(255, 99.4708025861 * Math.log(temp) - 161.1195681661));
+          blue = temp <= 19 ? 0 : Math.max(0, Math.min(255, 138.5177312231 * Math.log(temp - 10) - 305.0447927307));
+        } else {
+          red = Math.max(0, Math.min(255, 329.698727446 * Math.pow(temp - 60, -0.1332047592)));
+          green = Math.max(0, Math.min(255, 288.1221695283 * Math.pow(temp - 60, -0.0755148492)));
+          blue = 255;
+        }
+        return [Math.round(red), Math.round(green), Math.round(blue)];
+      }
+
+      function getFixtureRgb(f) {
+        if (f.gel && f.gel !== 'none' && GELS[f.gel]?.rgb) {
+          return GELS[f.gel].rgb;
+        }
+        return kelvinToRgb(f.cct);
+      }
+
+      // --- PHOTOMETRIC MATH ENGINE ---
+      function calculateIncidentPhotometrics() {
+        const hasSolo = state.fixtures.some(f => f.solo);
+        let totalLux = 0;
+        let keyLux = 0;
+        let fillLux = 0;
+        let weightedKelvinSum = 0;
+        let totalActiveWatts = 0;
+
+        const fixtureContributions = [];
+
+        state.fixtures.forEach(f => {
+          const isActive = !f.mute && (!hasSolo || f.solo);
+          if (isActive) {
+            totalActiveWatts += f.watts * (f.dimmer / 100);
+          }
+
+          if (!isActive || f.dimmer <= 0) {
+            fixtureContributions.push({ fixture: f, lux: 0, distance: 0, angleDeg: 0 });
+            return;
+          }
+
+          // 3D Distance in meters
+          const dx = state.subject.x - f.x;
+          const dy = state.subject.y - f.y;
+          const dz = state.subject.height - f.height;
+          const dist3D = Math.max(0.6, Math.sqrt(dx * dx + dy * dy + dz * dz));
+
+          // Aim angle relative to subject direction
+          // Vector from fixture to subject
+          const fixtureToSubAngle = Math.atan2(dy, dx);
+          // Fixture is aimed at subject or custom angle
+          const targetAngle = Math.atan2(state.subject.y - f.y, state.subject.x - f.x);
+          const angleDiff = Math.abs(fixtureToSubAngle - targetAngle);
+
+          // Beam attenuation across cone
+          const halfBeamRad = (f.beamAngle * Math.PI / 180) / 2;
+          let beamFalloff = 1.0;
+          if (angleDiff > halfBeamRad) {
+            beamFalloff = 0;
+          } else {
+            // Cosine penumbra rolloff
+            beamFalloff = Math.cos((angleDiff / halfBeamRad) * (Math.PI / 2));
+          }
+
+          // Elevation angle cosine
+          const cosElevation = Math.abs(dz) / dist3D;
+          const incidentCosine = Math.max(0.2, 1.0 - (cosElevation * 0.4));
+
+          // Modifier factor
+          const mod = MODIFIERS[f.modifier] || MODIFIERS.none;
+          const effectiveOutput = f.baseLux1m * (f.dimmer / 100) * mod.factor;
+
+          // Inverse Square Law: E = I / d^2
+          const incidentLux = (effectiveOutput / (dist3D * dist3D)) * incidentCosine * beamFalloff;
+
+          totalLux += incidentLux;
+          weightedKelvinSum += f.cct * incidentLux;
+
+          fixtureContributions.push({
+            fixture: f,
+            lux: incidentLux,
+            distance: dist3D,
+            angleDeg: Math.round(f.beamAngle)
+          });
+        });
+
+        // Determine Key vs Fill for Contrast Ratio
+        const activeContribs = fixtureContributions.filter(c => c.lux > 1).sort((a, b) => b.lux - a.lux);
+        if (activeContribs.length > 0) {
+          keyLux = activeContribs[0].lux;
+          if (activeContribs.length > 1) {
+            fillLux = activeContribs[1].lux;
+          } else {
+            fillLux = Math.max(1, keyLux * 0.05);
+          }
+        } else {
+          keyLux = 0;
+          fillLux = 0;
+        }
+
+        const contrastRatio = fillLux > 0 ? (keyLux / fillLux) : 1;
+        const mixedCct = totalLux > 10 ? Math.round(weightedKelvinSum / totalLux) : 4000;
+
+        // Camera Exposure Calculation:
+        // EV100 = log2(Lux / 2.5)
+        // With ISO: EV_iso = EV100 + log2(ISO/100)
+        // At Shutter 1/48s: Aperture N = sqrt(t * 2^EV_iso)
+        let tStop = 2.8;
+        let tStopStr = 'T/2.8';
+        if (totalLux > 5) {
+          const ev100 = Math.log2(Math.max(1, totalLux / 2.5));
+          const evIso = ev100 + Math.log2(state.camera.iso / 100);
+          const shutterTime = (state.camera.shutterAngle / 360) / state.camera.fps; // 1/48s
+          const rawAperture = Math.sqrt(shutterTime * Math.pow(2, evIso));
+          tStop = Math.max(1.0, Math.min(22.0, rawAperture));
+          tStopStr = 'T/' + tStop.toFixed(1);
+        } else {
+          tStopStr = '< T/1.0';
+        }
+
+        // False Color IRE calculation
+        // 55 IRE represents caucasian skin properly exposed at Key
+        // IRE varies roughly logarithmically with lux relative to base 800 lux @ T/2.8
+        let ire = 0;
+        if (totalLux > 0) {
+          // Normalize to baseline 750 lux = 55 IRE
+          const evDiff = Math.log2(Math.max(0.01, totalLux / 750));
+          ire = Math.round(55 + evDiff * 16);
+          ire = Math.max(0, Math.min(100, ire));
+        }
+
+        return {
+          totalLux: Math.round(totalLux),
+          footCandles: Math.round(totalLux * 0.0929),
+          keyLux: Math.round(keyLux),
+          fillLux: Math.round(fillLux),
+          contrastRatio: contrastRatio,
+          mixedCct: mixedCct,
+          tStopStr: tStopStr,
+          ire: ire,
+          totalWatts: Math.round(totalActiveWatts),
+          contributions: fixtureContributions
+        };
+      }
+
+      // --- CANVAS RENDERING (60 FPS) ---
+      const canvas = document.getElementById('stageCanvas');
+      const ctx = canvas.getContext('2d');
+      let canvasW = 0;
+      let canvasH = 0;
+      let stageScale = 45; // pixels per meter
+      let stageOriginX = 0;
+      let stageOriginY = 0;
+
+      function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvasW = rect.width;
+        canvasH = rect.height;
+        canvas.width = canvasW * dpr;
+        canvas.height = canvasH * dpr;
+        ctx.resetTransform();
+        ctx.scale(dpr, dpr);
+
+        stageOriginX = canvasW / 2;
+        stageOriginY = canvasH / 2;
+        stageScale = Math.min(canvasW, canvasH) / 8.5; // fits ~8.5 meters soundstage
+      }
+      window.addEventListener('resize', resizeCanvas);
+
+      function worldToScreen(wx, wy) {
+        return {
+          x: stageOriginX + wx * stageScale,
+          y: stageOriginY + wy * stageScale
+        };
+      }
+
+      function screenToWorld(sx, sy) {
+        return {
+          x: (sx - stageOriginX) / stageScale,
+          y: (sy - stageOriginY) / stageScale
+        };
+      }
+
+      // ANIMATION LOOP
+      let animFrameId = null;
+      let lastTime = performance.now();
+
+      function renderLoop(now) {
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+
+        updateHaze(dt);
+        drawStage();
+        updateTelemetry();
+
+        animFrameId = requestAnimationFrame(renderLoop);
+      }
+
+      function updateHaze(dt) {
+        if (!state.hazeEnabled) return;
+        state.particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < -5) p.x = 5;
+          if (p.x > 5) p.x = -5;
+          if (p.y < -5) p.y = 5;
+          if (p.y > 5) p.y = -5;
+        });
+      }
+
+      function drawStage() {
+        ctx.fillStyle = '#07090d';
+        ctx.fillRect(0, 0, canvasW, canvasH);
+
+        // 1. Grid lines (1 meter grid)
+        ctx.strokeStyle = '#151922';
+        ctx.lineWidth = 1;
+        const gridRange = 6;
+        for (let i = -gridRange; i <= gridRange; i++) {
+          const p1 = worldToScreen(i, -gridRange);
+          const p2 = worldToScreen(i, gridRange);
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+
+          const h1 = worldToScreen(-gridRange, i);
+          const h2 = worldToScreen(gridRange, i);
+          ctx.beginPath();
+          ctx.moveTo(h1.x, h1.y);
+          ctx.lineTo(h2.x, h2.y);
+          ctx.stroke();
+        }
+
+        // Soundstage perimeter walls
+        const wallMin = worldToScreen(-4.2, -4.2);
+        const wallMax = worldToScreen(4.2, 4.2);
+        ctx.strokeStyle = '#222836';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(wallMin.x, wallMin.y, wallMax.x - wallMin.x, wallMax.y - wallMin.y);
+
+        // Soundstage scale labels
+        ctx.fillStyle = '#3a4454';
+        ctx.font = '9px monospace';
+        ctx.fillText('-4m Wall', wallMin.x + 4, wallMin.y + 12);
+        ctx.fillText('+4m Wall', wallMax.x - 48, wallMax.y - 6);
+
+        const hasSolo = state.fixtures.some(f => f.solo);
+
+        // 2. Render Light Cones & Beams
+        state.fixtures.forEach(f => {
+          const isActive = !f.mute && (!hasSolo || f.solo);
+          if (!isActive || f.dimmer <= 0) return;
+
+          const fPos = worldToScreen(f.x, f.y);
+          const aimAngle = Math.atan2(state.subject.y - f.y, state.subject.x - f.x);
+          const halfBeam = (f.beamAngle * Math.PI / 180) / 2;
+          const beamReach = 6.0 * stageScale; // 6 meters reach
+
+          const [r, g, b] = getFixtureRgb(f);
+          const intensityNorm = (f.dimmer / 100);
+
+          ctx.save();
+          // Draw cone gradient
+          const coneGrad = ctx.createRadialGradient(
+            fPos.x, fPos.y, 4,
+            fPos.x, fPos.y, beamReach
+          );
+
+          if (state.viewMode === 'beams') {
+            coneGrad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.32 * intensityNorm})`);
+            coneGrad.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${0.16 * intensityNorm})`);
+            coneGrad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+          } else if (state.viewMode === 'isolines') {
+            coneGrad.addColorStop(0, `rgba(56, 189, 248, ${0.45 * intensityNorm})`);
+            coneGrad.addColorStop(0.35, `rgba(16, 185, 129, ${0.25 * intensityNorm})`);
+            coneGrad.addColorStop(0.7, `rgba(245, 158, 11, ${0.12 * intensityNorm})`);
+            coneGrad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+          } else {
+            // False Color mode
+            coneGrad.addColorStop(0, `rgba(236, 72, 153, ${0.4 * intensityNorm})`);
+            coneGrad.addColorStop(0.5, `rgba(37, 99, 235, ${0.2 * intensityNorm})`);
+            coneGrad.addColorStop(1, `rgba(0,0,0,0)`);
+          }
+
+          ctx.fillStyle = coneGrad;
+          ctx.beginPath();
+          ctx.moveTo(fPos.x, fPos.y);
+          ctx.arc(fPos.x, fPos.y, beamReach, aimAngle - halfBeam, aimAngle + halfBeam);
+          ctx.closePath();
+          ctx.fill();
+
+          // Beam outer ray strokes
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.4 * intensityNorm})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(fPos.x, fPos.y);
+          ctx.lineTo(fPos.x + Math.cos(aimAngle - halfBeam) * beamReach, fPos.y + Math.sin(aimAngle - halfBeam) * beamReach);
+          ctx.moveTo(fPos.x, fPos.y);
+          ctx.lineTo(fPos.x + Math.cos(aimAngle + halfBeam) * beamReach, fPos.y + Math.sin(aimAngle + halfBeam) * beamReach);
+          ctx.stroke();
+
+          // Central photometric centerline
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.2 * intensityNorm})`;
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath();
+          ctx.moveTo(fPos.x, fPos.y);
+          ctx.lineTo(fPos.x + Math.cos(aimAngle) * beamReach, fPos.y + Math.sin(aimAngle) * beamReach);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.restore();
+        });
+
+        // 3. Volumetric Haze Drift
+        if (state.hazeEnabled && state.viewMode === 'beams') {
+          ctx.save();
+          state.particles.forEach(p => {
+            const pScreen = worldToScreen(p.x, p.y);
+            // Compute light illumination on particle
+            let particleAlpha = 0.04;
+            state.fixtures.forEach(f => {
+              if (f.mute || f.dimmer <= 0) return;
+              const dx = p.x - f.x;
+              const dy = p.y - f.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 4.0) {
+                const angle = Math.atan2(dy, dx);
+                const aim = Math.atan2(state.subject.y - f.y, state.subject.x - f.x);
+                const diff = Math.abs(angle - aim);
+                const halfBeam = (f.beamAngle * Math.PI / 180) / 2;
+                if (diff < halfBeam) {
+                  particleAlpha += 0.22 * (1 - dist / 4.0) * (f.dimmer / 100);
+                }
+              }
+            });
+
+            ctx.fillStyle = `rgba(230, 240, 255, ${Math.min(0.65, particleAlpha)})`;
+            ctx.beginPath();
+            ctx.arc(pScreen.x, pScreen.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          ctx.restore();
+        }
+
+        // 4. Draw Subject / Talent Probe
+        const subPos = worldToScreen(state.subject.x, state.subject.y);
+        ctx.save();
+        // Talent outer footprint
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.beginPath();
+        ctx.arc(subPos.x, subPos.y, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Talent torso & shoulders
+        ctx.save();
+        ctx.translate(subPos.x, subPos.y);
+        ctx.rotate(state.subject.facingAngle);
+
+        // Facing nose arrow
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.moveTo(0, 16);
+        ctx.lineTo(-4, 9);
+        ctx.lineTo(4, 9);
+        ctx.closePath();
+        ctx.fill();
+
+        // Shoulders
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 14, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Head / Forehead sensor probe
+        const photo = calculateIncidentPhotometrics();
+        let headColor = '#f59e0b';
+        if (state.viewMode === 'falsecolor') {
+          // Color based on IRE
+          if (photo.ire < 15) headColor = '#2563eb';
+          else if (photo.ire < 38) headColor = '#10b981';
+          else if (photo.ire < 60) headColor = '#ec4899'; // optimum skin
+          else if (photo.ire < 75) headColor = '#f59e0b';
+          else headColor = '#ef4444';
+        } else {
+          headColor = `rgb(${kelvinToRgb(photo.mixedCct).join(',')})`;
+        }
+
+        ctx.fillStyle = headColor;
+        ctx.beginPath();
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.restore();
+
+        // Label above talent
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('TALENT PROBE', subPos.x, subPos.y - 24);
+        ctx.font = '9px monospace';
+        ctx.fillStyle = 'var(--text-muted)';
+        ctx.fillText(`${photo.totalLux} LUX`, subPos.x, subPos.y - 13);
+        ctx.restore();
+
+        // 5. Draw Fixtures
+        state.fixtures.forEach(f => {
+          const fPos = worldToScreen(f.x, f.y);
+          const isSelected = f.id === state.selectedFixtureId;
+          const [r, g, b] = getFixtureRgb(f);
+          const isMuted = f.mute || (hasSolo && !f.solo);
+
+          ctx.save();
+          // Halo glow if selected or active
+          if (isSelected) {
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(fPos.x, fPos.y, 16, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Fixture housing
+          ctx.fillStyle = isMuted ? '#1a1f29' : `rgb(${r}, ${g}, ${b})`;
+          ctx.beginPath();
+          ctx.arc(fPos.x, fPos.y, 9, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = isSelected ? '#ffffff' : '#334155';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Fixture Aim Direction Indicator
+          const aimAngle = Math.atan2(state.subject.y - f.y, state.subject.x - f.x);
+          const pointerLen = 14;
+          ctx.strokeStyle = isMuted ? '#475569' : `rgb(${r}, ${g}, ${b})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(fPos.x, fPos.y);
+          ctx.lineTo(fPos.x + Math.cos(aimAngle) * pointerLen, fPos.y + Math.sin(aimAngle) * pointerLen);
+          ctx.stroke();
+
+          // Text label
+          ctx.fillStyle = isSelected ? '#38bdf8' : '#cbd5e1';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(f.name.split('·')[0].trim(), fPos.x + 14, fPos.y + 3);
+
+          ctx.fillStyle = '#64748b';
+          ctx.font = '9px monospace';
+          ctx.fillText(`${f.dimmer}% · ${f.cct}K`, fPos.x + 14, fPos.y + 13);
+
+          ctx.restore();
+        });
+      }
+
+      // --- TELEMETRY & DOM UPDATES ---
+      function updateTelemetry() {
+        const photo = calculateIncidentPhotometrics();
+
+        // Top badges & meters
+        document.getElementById('telemetryLux').innerHTML = `${photo.totalLux} <span class="sub">LUX</span>`;
+        document.getElementById('telemetryFc').textContent = `${photo.footCandles} foot-candles`;
+
+        const ratioText = `${photo.contrastRatio.toFixed(1)} : 1`;
+        document.getElementById('telemetryRatio').innerHTML = `${ratioText} <span class="sub">RATIO</span>`;
+
+        const pill = document.getElementById('ratioPill');
+        if (photo.contrastRatio >= 6.0) {
+          pill.className = 'ratio-pill ratio-noir';
+          pill.textContent = 'High Contrast Noir (6:1+)';
+        } else if (photo.contrastRatio >= 2.5) {
+          pill.className = 'ratio-pill ratio-drama';
+          pill.textContent = 'Naturalistic Narrative (3:1)';
+        } else {
+          pill.className = 'ratio-pill ratio-soft';
+          pill.textContent = 'Commercial Soft Key (1.5:1)';
+        }
+
+        document.getElementById('telemetryAperture').innerHTML = `${photo.tStopStr} <span class="sub">@ ISO 800</span>`;
+        document.getElementById('telemetryKelvin').innerHTML = `${photo.mixedCct} <span class="sub">KELVIN</span>`;
+
+        const [kr, kg, kb] = kelvinToRgb(photo.mixedCct);
+        document.getElementById('kelvinSwatchBar').style.background = `rgb(${kr}, ${kg}, ${kb})`;
+
+        // False color IRE
+        const ireMarker = document.getElementById('ireMarker');
+        ireMarker.style.left = `${photo.ire}%`;
+        const ireLabel = document.getElementById('ireValueLabel');
+        let ireDesc = 'Under-exposed Shadow';
+        if (photo.ire >= 50 && photo.ire <= 60) ireDesc = 'Optimum Skin Key Exposure';
+        else if (photo.ire > 60 && photo.ire <= 75) ireDesc = 'Bright Skin / Rim Highlight';
+        else if (photo.ire > 75) ireDesc = 'Near Sensor Clipping!';
+        else if (photo.ire >= 35) ireDesc = 'Natural Fill Tone';
+        ireLabel.textContent = `${photo.ire} IRE · ${ireDesc}`;
+
+        // Power Draw
+        document.getElementById('powerWatts').textContent = `${photo.totalWatts} W`;
+        const amps = (photo.totalWatts / 120).toFixed(1);
+        document.getElementById('powerAmps').textContent = `(${amps}A @ 120V)`;
+
+        const powerPill = document.getElementById('powerPill');
+        if (amps > 16.0) {
+          powerPill.className = 'power-pill warn';
+          powerPill.innerHTML = '<span>&bull;</span> EXCEEDS 15A CIRCUIT (USE 20A+)';
+        } else {
+          powerPill.className = 'power-pill';
+          powerPill.innerHTML = '<span>&bull;</span> SAFE ON 20A BREAKER';
+        }
+
+        // Talent HUD pos
+        document.getElementById('hudTalentPos').textContent = `X: ${state.subject.x.toFixed(1)}m, Y: ${state.subject.y.toFixed(1)}m`;
+      }
+
+      // --- FIXTURES LIST RENDERER ---
+      function renderFixturesList() {
+        const container = document.getElementById('fixturesList');
+        container.innerHTML = '';
+        document.getElementById('fixtureCount').textContent = state.fixtures.length;
+
+        state.fixtures.forEach(f => {
+          const card = document.createElement('div');
+          card.className = `fixture-card ${f.id === state.selectedFixtureId ? 'selected' : ''}`;
+          card.onclick = () => selectFixture(f.id);
+
+          const [r, g, b] = getFixtureRgb(f);
+
+          card.innerHTML = `
+            <div class="fixture-top">
+              <div class="fixture-label-group">
+                <div class="fixture-swatch" style="background: rgb(${r},${g},${b}); box-shadow: 0 0 6px rgba(${r},${g},${b}, 0.5);"></div>
+                <div class="fixture-name">${f.name}</div>
+                <div class="fixture-role">${f.role}</div>
+              </div>
+              <div class="fixture-toggles">
+                <button class="mini-btn ${f.solo ? 'active-solo' : ''}" data-action="solo" data-id="${f.id}" title="Solo fixture">S</button>
+                <button class="mini-btn ${f.mute ? 'active-mute' : ''}" data-action="mute" data-id="${f.id}" title="Mute fixture">M</button>
+              </div>
+            </div>
+            <div class="fixture-meta">
+              <span>Dim: <strong>${f.dimmer}%</strong></span>
+              <span>CCT: <strong>${f.cct}K</strong></span>
+              <span>Beam: <strong>${f.beamAngle}&deg;</strong></span>
+            </div>
+          `;
+
+          container.appendChild(card);
+        });
+
+        // Wire mini button clicks
+        container.querySelectorAll('button[data-action]').forEach(btn => {
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            const action = btn.getAttribute('data-action');
+            const id = btn.getAttribute('data-id');
+            const targetFix = state.fixtures.find(f => f.id === id);
+            if (!targetFix) return;
+
+            if (action === 'solo') {
+              targetFix.solo = !targetFix.solo;
+            } else if (action === 'mute') {
+              targetFix.mute = !targetFix.mute;
+            }
+            renderFixturesList();
+          };
+        });
+
+        updateInspectorFields();
+      }
+
+      function selectFixture(id) {
+        state.selectedFixtureId = id;
+        renderFixturesList();
+      }
+
+      function updateInspectorFields() {
+        const f = state.fixtures.find(fix => fix.id === state.selectedFixtureId);
+        const box = document.getElementById('inspectorBox');
+        if (!f) {
+          box.style.display = 'none';
+          return;
+        }
+        box.style.display = 'flex';
+
+        document.getElementById('inspectorName').textContent = f.name;
+        document.getElementById('inspDimmer').value = f.dimmer;
+        document.getElementById('inspDimmerVal').textContent = `${f.dimmer}%`;
+
+        document.getElementById('inspCct').value = f.cct;
+        document.getElementById('inspCctVal').textContent = `${f.cct}K`;
+
+        document.getElementById('inspAngle').value = f.beamAngle;
+        document.getElementById('inspAngleVal').textContent = `${f.beamAngle}°`;
+
+        document.getElementById('inspHeight').value = f.height;
+        document.getElementById('inspHeightVal').textContent = `${f.height.toFixed(1)}m`;
+
+        document.getElementById('inspModifier').value = f.modifier;
+        const mod = MODIFIERS[f.modifier] || MODIFIERS.none;
+        document.getElementById('inspModVal').textContent = `${mod.evLoss} EV`;
+
+        document.getElementById('inspGel').value = f.gel || 'none';
+      }
+
+      // --- WIRE CONTROLS & INSPECTOR LISTENERS ---
+      document.getElementById('inspDimmer').addEventListener('input', (e) => {
+        const f = state.fixtures.find(fix => fix.id === state.selectedFixtureId);
+        if (f) {
+          f.dimmer = parseInt(e.target.value, 10);
+          document.getElementById('inspDimmerVal').textContent = `${f.dimmer}%`;
+          renderFixturesList();
+        }
+      });
+
+      document.getElementById('inspCct').addEventListener('input', (e) => {
+        const f = state.fixtures.find(fix => fix.id === state.selectedFixtureId);
+        if (f) {
+          f.cct = parseInt(e.target.value, 10);
+          document.getElementById('inspCctVal').textContent = `${f.cct}K`;
+          renderFixturesList();
+        }
+      });
+
+      document.getElementById('inspAngle').addEventListener('input', (e) => {
+        const f = state.fixtures.find(fix => fix.id === state.selectedFixtureId);
+        if (f) {
+          f.beamAngle = parseInt(e.target.value, 10);
+          document.getElementById('inspAngleVal').textContent = `${f.beamAngle}°`;
+          renderFixturesList();
+        }
+      });
+
+      document.getElementById('inspHeight').addEventListener('input', (e) => {
+        const f = state.fixtures.find(fix => fix.id === state.selectedFixtureId);
+        if (f) {
+          f.height = parseFloat(e.target.value);
+          document.getElementById('inspHeightVal').textContent = `${f.height.toFixed(1)}m`;
+        }
+      });
+
+      document.getElementById('inspModifier').addEventListener('change', (e) => {
+        const f = state.fixtures.find(fix => fix.id === state.selectedFixtureId);
+        if (f) {
+          f.modifier = e.target.value;
+          const mod = MODIFIERS[f.modifier] || MODIFIERS.none;
+          document.getElementById('inspModVal').textContent = `${mod.evLoss} EV`;
+          renderFixturesList();
+        }
+      });
+
+      document.getElementById('inspGel').addEventListener('change', (e) => {
+        const f = state.fixtures.find(fix => fix.id === state.selectedFixtureId);
+        if (f) {
+          f.gel = e.target.value;
+          renderFixturesList();
+        }
+      });
+
+      document.getElementById('deleteFixtureBtn').addEventListener('click', () => {
+        if (state.fixtures.length <= 1) {
+          alert('Stage must have at least one lighting fixture.');
+          return;
+        }
+        state.fixtures = state.fixtures.filter(f => f.id !== state.selectedFixtureId);
+        state.selectedFixtureId = state.fixtures[0].id;
+        renderFixturesList();
+      });
+
+      // --- ADD FIXTURE BUTTON ---
+      document.getElementById('addLightBtn').addEventListener('click', () => {
+        const newId = 'f' + (Date.now() % 10000);
+        const count = state.fixtures.length + 1;
+        const newFixture = {
+          id: newId,
+          name: `Spot · Fixture #${count}`,
+          role: 'Accent / Practical',
+          x: (Math.random() - 0.5) * 3,
+          y: -2.5,
+          height: 2.2,
+          beamAngle: 45,
+          dimmer: 80,
+          cct: 5600,
+          baseLux1m: 24000,
+          modifier: 'none',
+          gel: 'none',
+          watts: 300,
+          solo: false,
+          mute: false
+        };
+        state.fixtures.push(newFixture);
+        state.selectedFixtureId = newId;
+        renderFixturesList();
+      });
+
+      // --- PRESETS SWITCHING ---
+      document.getElementById('presetSelect').addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (PRESETS[val]) {
+          state.fixtures = JSON.parse(JSON.stringify(PRESETS[val].fixtures));
+          state.selectedFixtureId = state.fixtures[0].id;
+          renderFixturesList();
+        }
+      });
+
+      // --- HAZE TOGGLE ---
+      const hazeBtn = document.getElementById('hazeToggleBtn');
+      hazeBtn.addEventListener('click', () => {
+        state.hazeEnabled = !state.hazeEnabled;
+        if (state.hazeEnabled) {
+          hazeBtn.classList.add('active');
+          hazeBtn.querySelector('span').textContent = 'Haze: ON';
+        } else {
+          hazeBtn.classList.remove('active');
+          hazeBtn.querySelector('span').textContent = 'Haze: OFF';
+        }
+      });
+
+      // --- VIEW MODES ---
+      const modeTabs = [
+        { id: 'modeBeams', mode: 'beams' },
+        { id: 'modeIsolines', mode: 'isolines' },
+        { id: 'modeFalseColor', mode: 'falsecolor' }
+      ];
+
+      modeTabs.forEach(tab => {
+        document.getElementById(tab.id).addEventListener('click', () => {
+          state.viewMode = tab.mode;
+          modeTabs.forEach(t => document.getElementById(t.id).classList.remove('active'));
+          document.getElementById(tab.id).classList.add('active');
+        });
+      });
+
+      // --- SPEC SHEET / MODAL ---
+      const specModal = document.getElementById('specModal');
+      document.getElementById('specSheetBtn').addEventListener('click', () => {
+        populateSpecSheet();
+        specModal.classList.add('open');
+      });
+      document.getElementById('closeModalBtn').addEventListener('click', () => {
+        specModal.classList.remove('open');
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') specModal.classList.remove('open');
+      });
+
+      function populateSpecSheet() {
+        const photo = calculateIncidentPhotometrics();
+        document.getElementById('modalRatio').textContent = `${photo.contrastRatio.toFixed(1)} : 1 (${photo.keyLux} lx / ${photo.fillLux} lx)`;
+        document.getElementById('modalAperture').textContent = `${photo.tStopStr} (180°, ISO 800)`;
+        document.getElementById('modalPower').textContent = `${photo.totalWatts} W (${(photo.totalWatts/120).toFixed(1)} A)`;
+
+        const tbody = document.getElementById('modalTableBody');
+        tbody.innerHTML = '';
+        photo.contributions.forEach(item => {
+          const tr = document.createElement('tr');
+          const modName = MODIFIERS[item.fixture.modifier]?.name || 'Open Face';
+          const gelName = GELS[item.fixture.gel]?.name || 'None';
+          tr.innerHTML = `
+            <td><strong>${item.fixture.name}</strong></td>
+            <td><span style="padding:2px 5px; background:#222; border-radius:3px;">${item.fixture.role}</span></td>
+            <td>${item.fixture.cct}K ${item.fixture.gel !== 'none' ? '· ' + gelName : ''}</td>
+            <td>${item.distance.toFixed(2)} m</td>
+            <td><strong style="color:var(--accent-blue)">${Math.round(item.lux)} lx</strong></td>
+            <td>${modName}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // --- DRAG & DROP ON CANVAS (MOUSE & TOUCH) ---
+      let isDragging = false;
+      let dragTarget = null; // 'subject' or fixture object
+
+      function getEventPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          sx: clientX - rect.left,
+          sy: clientY - rect.top
+        };
+      }
+
+      function handleDragStart(e) {
+        const { sx, sy } = getEventPos(e);
+        const clickWorld = screenToWorld(sx, sy);
+
+        // Check if talent probe clicked
+        const dSubject = Math.hypot(clickWorld.x - state.subject.x, clickWorld.y - state.subject.y);
+        if (dSubject < 0.5) {
+          isDragging = true;
+          dragTarget = 'subject';
+          return;
+        }
+
+        // Check if any fixture clicked
+        for (let i = state.fixtures.length - 1; i >= 0; i--) {
+          const f = state.fixtures[i];
+          const dFix = Math.hypot(clickWorld.x - f.x, clickWorld.y - f.y);
+          if (dFix < 0.45) {
+            isDragging = true;
+            dragTarget = f;
+            selectFixture(f.id);
+            return;
+          }
+        }
+      }
+
+      function handleDragMove(e) {
+        if (!isDragging || !dragTarget) return;
+        if (e.cancelable) e.preventDefault();
+
+        const { sx, sy } = getEventPos(e);
+        const worldPos = screenToWorld(sx, sy);
+
+        // Clamp to soundstage boundary [-3.8m, 3.8m]
+        const clampedX = Math.max(-3.8, Math.min(3.8, worldPos.x));
+        const clampedY = Math.max(-3.8, Math.min(3.8, worldPos.y));
+
+        if (dragTarget === 'subject') {
+          state.subject.x = clampedX;
+          state.subject.y = clampedY;
+        } else {
+          dragTarget.x = clampedX;
+          dragTarget.y = clampedY;
+        }
+      }
+
+      function handleDragEnd() {
+        isDragging = false;
+        dragTarget = null;
+      }
+
+      canvas.addEventListener('mousedown', handleDragStart);
+      window.addEventListener('mousemove', handleDragMove);
+      window.addEventListener('mouseup', handleDragEnd);
+
+      canvas.addEventListener('touchstart', handleDragStart, { passive: false });
+      window.addEventListener('touchmove', handleDragMove, { passive: false });
+      window.addEventListener('touchend', handleDragEnd);
+
+      // --- INITIAL BOOT ---
+      resizeCanvas();
+      renderFixturesList();
+      requestAnimationFrame(renderLoop);
+
+    })();
+  </script>
+</body>
+</html>
