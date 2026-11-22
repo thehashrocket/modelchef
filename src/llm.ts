@@ -139,6 +139,8 @@ export async function chat(
             // whole budget before writing anything. Worth another attempt.
             answered = true;
             errors.push(`${ref.provider}/${ref.model}: empty reply (stop reason: ${stop})`);
+            // Out of budget before writing a word: the same budget will fail the same way.
+            if (stop === 'length') break;
             await wait(attempt * 5_000, signal);
             continue;
           }
