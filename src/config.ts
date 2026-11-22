@@ -127,7 +127,9 @@ export const JUDGES: Judge[] = [
     // The fallback is another lab with no chef in the kitchen.
     models: [
       { provider: 'openrouter', model: 'inclusionai/ling-3.2-flash:free' },
-      { provider: 'openrouter', model: 'dots-studio/dots-3-note-preview:free' },
+      // Was dots-studio/dots-3-note-preview:free, retired by OpenRouter (404) in
+      // November 2026. Particle-1 is post-trained on DeepSeek; no DeepSeek chef.
+      { provider: 'openrouter', model: 'particle-ai/particle-1:free' },
     ],
     short: 'Pragmatist',
     color: { light: '#0369a1', dark: '#7dd3fc' },
