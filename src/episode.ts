@@ -458,9 +458,19 @@ async function main() {
   // Set CHROME_PATH to use an installed Chrome instead of Playwright's download.
   const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
   try {
-    for (const [i, chef] of active.entries()) {
+    // A chef whose provider is down gets a second turn at the end of the round, after
+    // everyone else has cooked: provider outages are often over by then. Same brief,
+    // and chefs never see each other's dishes, so cooking later is no advantage.
+    const queue = [...active.entries()].map(([i, chef]) => ({ i, chef, turn: 1 }));
+    for (let q = 0; q < queue.length; q++) {
+      const { i, chef, turn } = queue[q]!;
       const path = join(dir, 'apps', `${chef.id}.html`);
       const cooked = await cook(chef, cookPrompt(chef, n, challenge, state), path);
+      if (cooked.sitOut && turn === 1) {
+        warn(`${chef.id}'s provider is not answering; ${chef.id} cooks again at the end of the round.`);
+        queue.push({ i, chef, turn: 2 });
+        continue;
+      }
       if (cooked.sitOut) {
         satOut.push({ contestant: chef.id, reason: cooked.sitOut });
         warn(`${chef.id} sits out: ${cooked.sitOut}`);
