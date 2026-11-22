@@ -123,7 +123,11 @@ async function cook(chef: Contestant, messages: Msg[], path: string): Promise<Co
     // No provider answered at all: an outage, not a bad dish. The chef sits out.
     if (err instanceof ChatError && !err.answered) return { ...base, forfeit: null, sitOut: `No provider answered: ${err.message.slice(0, 300)}` };
     // A model that replied but never served a dish forfeits, as before.
-    return { ...base, forfeit: `Model unavailable: ${(err as Error).message.slice(0, 300)}` };
+    const msg = (err as Error).message;
+    if (err instanceof ChatError && /stop reason: length/.test(msg)) {
+      return { ...base, forfeit: `The model spent its whole ${chef.maxTokens}-token output budget without writing a dish (a thinking model reasoning past the limit). Raise this chef's maxTokens.` };
+    }
+    return { ...base, forfeit: `Model unavailable: ${msg.slice(0, 300)}` };
   }
 }
 
@@ -151,6 +155,35 @@ class GuestBudget {
   }
 }
 const GUEST_BUDGET_MS = 15 * 60_000;
+
+/**
+ * How long each judge seat may spend, across the whole episode, waiting out a provider
+ * that is not answering (429s, server errors). Free tiers do not bill failed calls, so it
+ * costs only time; sharing it per seat keeps a dead judge from eating the 90-minute
+ * Actions limit one dish at a time. Once spent, that judge's later calls get one pass only.
+ */
+const JUDGE_PATIENCE_MS = Number(process.env.JUDGE_PATIENCE_MS ?? 10 * 60_000);
+
+class JudgePatience {
+  private left = new Map<string, number>();
+  ms(judgeId: string) {
+    return this.left.get(judgeId) ?? JUDGE_PATIENCE_MS;
+  }
+  /** Times a judge call, and charges the seat for it when no provider answered at all. */
+  async run<T>(judgeId: string, call: (patienceMs: number) => Promise<T>): Promise<T> {
+    const started = Date.now();
+    try {
+      return await call(this.ms(judgeId));
+    } catch (err) {
+      if (err instanceof ChatError && !err.answered) {
+        this.left.set(judgeId, Math.max(0, this.ms(judgeId) - (Date.now() - started)));
+        console.warn(`[${judgeId}] no provider answered: ${err.message}`);
+      }
+      throw err;
+    }
+  }
+}
+const judgePatience = new JudgePatience();
 
 /** OpenRouter balance for the guest. The mock never calls the network: MOCK_GUEST_FAIL=balance reads as nearly empty. */
 async function guestCredit(guest: Judge): Promise<CreditReading> {
@@ -186,7 +219,10 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef:
         const opts = { maxTokens: 8000, temperature: 0.4, kind: 'judge' as const, tag: `${judge.id}:${chef.id}` };
         const prompt = judgePrompt(judge, challenge, dish, show);
         // Only the finale guest runs on a budget.
-        const res = guestBudget && judge.id === GUEST_JUDGE?.id ? await guestBudget.run((signal) => chat(judge.models, prompt, { ...opts, signal })) : await chat(judge.models, prompt, opts);
+        const res =
+          guestBudget && judge.id === GUEST_JUDGE?.id
+            ? await guestBudget.run((signal) => chat(judge.models, prompt, { ...opts, signal }))
+            : await judgePatience.run(judge.id, (patienceMs) => chat(judge.models, prompt, { ...opts, patienceMs }));
         replied = modelOf(res);
         const { text } = res;
         raw = text;
@@ -216,6 +252,8 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef:
         failure = (err as Error).message.slice(0, 200);
         // The record keeps only the error; the raw reply goes to the run log so the next one can be diagnosed.
         if (raw) console.warn(`[${judge.id}:${chef.id}] unreadable reply (attempt ${attempt}, ${replied}): ${raw.slice(0, 4000)}`);
+        // An outage already had its patience inside chat(); a second pass right away rarely helps.
+        if (err instanceof ChatError && !err.answered) break;
       }
     }
     if (failure) abstained.push({ judge: judge.id, judgeName: judge.name, reason: `Unavailable: ${failure}`, ...(replied ? { model: replied } : {}) });
@@ -269,7 +307,10 @@ async function pressureTest(
     // Kept so the site can say which chef "Dish A" and "Dish B" were in this judge's reason.
     vote.order = [a.id, b.id];
     try {
-      const res = await chat(judge.models, duelPrompt(judge, spec, dishes.get(a.id)!, dishes.get(b.id)!, show), { maxTokens: 8000, temperature: 0.3, kind: 'duel', tag: `${judge.id}:duel` });
+      const prompt = duelPrompt(judge, spec, dishes.get(a.id)!, dishes.get(b.id)!, show);
+      const res = await judgePatience.run(judge.id, (patienceMs) =>
+        chat(judge.models, prompt, { maxTokens: 8000, temperature: 0.3, kind: 'duel', tag: `${judge.id}:duel`, patienceMs }),
+      );
       vote.model = modelOf(res);
       const { text } = res;
       const reply = parseJson<{ winner?: string; reason?: string }>(text);
