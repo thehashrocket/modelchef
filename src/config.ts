@@ -91,7 +91,10 @@ export const CONTESTANTS: Contestant[] = [
     name: 'ERNIE 5.5 Flash',
     family: 'baidu',
     models: [{ provider: 'openrouter', model: 'baidu/ernie-5.5-flash-preview:free' }],
-    maxTokens: 16000,
+    // Raised from 16000 after episode 2: on Invention briefs it spent the whole
+    // budget thinking and served nothing (live and in rehearsal). OpenRouter
+    // allows 921,600 output tokens for this model (2026-11-22).
+    maxTokens: 32000,
   },
   {
     id: 'nemotron',
