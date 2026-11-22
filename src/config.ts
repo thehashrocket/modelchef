@@ -74,7 +74,12 @@ export const CONTESTANTS: Contestant[] = [
     id: 'gemma',
     name: 'Gemma 4 31B',
     family: 'google',
-    models: [{ provider: 'gemini', model: 'gemma-4-31b-it' }],
+    // Same weights on another host, for when Google's free tier is overloaded (503s
+    // sat out both Google chefs in a 2026-11-22 rehearsal).
+    models: [
+      { provider: 'gemini', model: 'gemma-4-31b-it' },
+      { provider: 'openrouter', model: 'google/gemma-4-31b-it:free' },
+    ],
     maxTokens: 16000,
   },
   {
