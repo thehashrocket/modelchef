@@ -91,6 +91,8 @@ interface Cooked {
  * chef sits the episode out. Providers do not bill failed calls, so waiting costs only time.
  */
 const COOK_PATIENCE_MS = Number(process.env.COOK_PATIENCE_MS ?? 10 * 60_000);
+/** How long the winner's theme pick waits out a provider that is not answering. */
+const THEME_PATIENCE_MS = Number(process.env.THEME_PATIENCE_MS ?? 5 * 60_000);
 /** More chefs than this sitting out in one episode means the episode is not recorded. */
 const MAX_SAT_OUT = 2;
 
@@ -215,6 +217,7 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef:
     for (let attempt = 1; attempt <= 2; attempt++) {
       replied = undefined;
       let raw = '';
+      let stop = '';
       try {
         const opts = { maxTokens: 8000, temperature: 0.4, kind: 'judge' as const, tag: `${judge.id}:${chef.id}` };
         const prompt = judgePrompt(judge, challenge, dish, show);
@@ -224,6 +227,7 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef:
             ? await guestBudget.run((signal) => chat(judge.models, prompt, { ...opts, signal }))
             : await judgePatience.run(judge.id, (patienceMs) => chat(judge.models, prompt, { ...opts, patienceMs }));
         replied = modelOf(res);
+        stop = res.stop;
         const { text } = res;
         raw = text;
         const reply = parseJson<{ scores?: Partial<Scores>; critique?: string; improve?: string }>(text);
@@ -251,7 +255,7 @@ async function judgeDish(panel: Judge[], challenge: Challenge, dish: Dish, chef:
       } catch (err) {
         failure = (err as Error).message.slice(0, 200);
         // The record keeps only the error; the raw reply goes to the run log so the next one can be diagnosed.
-        if (raw) console.warn(`[${judge.id}:${chef.id}] unreadable reply (attempt ${attempt}, ${replied}): ${raw.slice(0, 4000)}`);
+        if (raw) console.warn(`[${judge.id}:${chef.id}] unreadable reply (attempt ${attempt}, ${replied}, stop reason ${stop}, ${raw.length} chars): ${(err as Error).message}\n${raw.slice(0, 4000)}`);
         // An outage already had its patience inside chat(); a second pass right away rarely helps.
         if (err instanceof ChatError && !err.answered) break;
       }
@@ -572,7 +576,8 @@ async function main() {
     const chef = active.find((c) => c.id === winner)!;
     const used = state.episodes.map((e) => e.theme).filter((t): t is string => !!t);
     try {
-      const { text } = await chat(chef.models, themePrompt(chef, used), { maxTokens: 4000, kind: 'theme', tag: chef.id });
+      // The pick is the winner's prize: wait out an outage instead of losing it to one.
+      const { text } = await chat(chef.models, themePrompt(chef, used), { maxTokens: 4000, kind: 'theme', tag: chef.id, patienceMs: THEME_PATIENCE_MS });
       const chosen = String(parseJson<{ theme?: string }>(text).theme ?? '').trim().slice(0, 120);
       if (chosen) state.nextTheme = { theme: chosen, chosenBy: winner };
     } catch (err) {
